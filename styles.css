@@ -27,8 +27,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ---------- top bar ---------- */
 .topbar { position: sticky; top: 0; z-index: 20; background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
-.topbar::after { content: ""; display: block; height: 5px; background: linear-gradient(100deg, var(--blue) 0 55%, var(--white) 55% 58%, var(--red) 58% 82%, var(--white) 82% 84%, var(--yellow) 84%); }
-:root[data-theme="dark"] .topbar::after { background: linear-gradient(100deg, var(--blue) 0 55%, #0a0f1a 55% 58%, var(--red) 58% 82%, #0a0f1a 82% 84%, var(--yellow) 84%); }
+.topbar::after { content: ""; display: block; height: 5px; background: linear-gradient(100deg, var(--blue) 0 56%, var(--red) 56% 83%, var(--yellow) 83%); }
 .topbar-inner { display: flex; align-items: center; gap: 22px; padding: 10px 24px; max-width: 1500px; margin: 0 auto; }
 .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
 .brand img { width: 40px; height: 40px; }
