@@ -249,11 +249,11 @@
     const actions = VIEW ? '' : `<div class="actions">
         <button class="btn primary" id="edit">Edit details</button>
         <button class="btn" id="photo">Change photo</button>
-        <button class="btn" id="relookup" title="Re-run the online lookup using the current title">Update from name</button>
         <button class="btn" id="reprice">Refresh value</button>
-        ${it.list === 'wishlist' ? '<button class="btn red" id="gotit">Got it! Move to collection</button>' : ''}
+        <button class="btn danger" id="del">Delete entry</button>
+        ${it.list === 'wishlist' ? '<button class="btn go" id="gotit">Got it! Move to collection</button>' : ''}
       </div>
-      <div class="danger-row"><span>Remove this entry from your ${it.list === 'wishlist' ? 'wishlist' : 'collection'}</span><button class="link-danger" id="del">Delete entry</button></div>`;
+`;
 
     $app.innerHTML = `<a class="back" href="${backHref}">${ICON.back} Back to ${it.list === 'wishlist' ? 'wishlist' : 'collection'}</a>
       <div class="item">
@@ -274,7 +274,6 @@
     if (VIEW) return;
     document.getElementById('edit').onclick = () => editForm(it);
     document.getElementById('photo').onclick = () => photoPicker(it);
-    document.getElementById('relookup').onclick = () => relookup(it);
     const fr = document.getElementById('findrrp'); if (fr) fr.onclick = (e) => { e.preventDefault(); rrpIntro(it.limited, () => rrpPicker(it, async (c) => { await applyRrp(it, c); renderItem(it.id); })); };
     const ok = document.getElementById('rrpok'); if (ok) ok.onclick = async (e) => { e.preventDefault(); await API.saveItem({ ...it, rrpSource: 'verified' }); DB = await API.getDB(); toast('RRP marked as checked'); renderItem(it.id); };
     const rs = document.getElementById('rrpsrc'); if (rs) rs.onclick = (e) => { e.preventDefault(); API.openUrl(it.rrpUrl); };
@@ -511,7 +510,7 @@
       <div class="form"><label class="span-3">Price paid (£)<input class="input" name="paid" type="number" step="0.01" value="${it.targetPrice ?? ''}" required></label>
       <label class="span-3">Date<input class="input" name="added" type="date" value="${new Date().toISOString().slice(0, 10)}"></label>
       <label class="span-6 check"><input type="checkbox" name="gift"> It was a gift</label></div>
-      <div class="row" style="margin-top:16px"><button class="btn red" type="submit">Move to collection</button></div></form></div>`;
+      <div class="row" style="margin-top:16px"><button class="btn go" type="submit">Move to collection</button></div></form></div>`;
     document.body.appendChild(bg);
     bg.querySelector('#x').onclick = () => bg.remove();
     const gift = bg.querySelector('[name=gift]'), paid = bg.querySelector('[name=paid]');

@@ -295,3 +295,8 @@ table.list td.num { white-space: nowrap; }
 .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
 .to-top:hover { background: var(--red); }
 @media (max-width: 640px) { .to-top { right: 14px; bottom: 14px; width: 42px; height: 42px; } }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.go { background: #0f8a4b; border-color: #0f8a4b; color: #fff; }
+.btn.go:hover { background: #0c7340; border-color: #0c7340; }
+.actions .btn.go { grid-column: 1 / -1; }
