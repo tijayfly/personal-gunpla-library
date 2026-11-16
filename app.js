@@ -160,7 +160,7 @@
       }
     }
     return `<a class="card" href="#/item/${it.id}" style="--card-accent:${accent}">
-      <div class="card-img">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${it.limited ? '<span class="flag">LIMITED</span>' : ''}${plTag}</div>
+      <div class="card-img${it.limited ? ' ltd' : ''}">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${it.limited ? '<span class="flag">LIMITED</span>' : '<span class="flag std">STANDARD</span>'}${plTag}</div>
       <div class="card-body"><div class="card-title">${esc(it.title)}${it.qty > 1 ? ` <span class="model-no">×${it.qty}</span>` : ''}</div><div class="card-series">${esc(it.series || '')}</div>${money}</div>
     </a>`;
   }
@@ -250,7 +250,7 @@
         <button class="btn primary" id="edit">Edit details</button>
         <button class="btn" id="photo">Change photo</button>
         <button class="btn" id="relookup" title="Re-run the online lookup using the current title">Update from name</button>
-        <button class="btn" id="reprice">Refresh price</button>
+        <button class="btn" id="reprice">Refresh value</button>
         ${it.list === 'wishlist' ? '<button class="btn red" id="gotit">Got it! Move to collection</button>' : ''}
       </div>
       <div class="danger-row"><span>Remove this entry from your ${it.list === 'wishlist' ? 'wishlist' : 'collection'}</span><button class="link-danger" id="del">Delete entry</button></div>`;
@@ -601,7 +601,7 @@
           <div class="span-3" style="align-self:end"><button class="btn" type="button" id="fx">Update rate online</button></div>
         </div>
         <p class="hint" style="margin-top:10px">${s.fxUpdated ? 'Rate updated ' + esc(s.fxUpdated) : 'Rate not yet updated online'} · keys are stored only in your local data file.</p>
-        <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="rp">Refresh all prices</button></div>
+        <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="rp">Refresh all values</button></div>
       </form>
       <form class="panel" id="gf2"><h2>View-only page</h2><p class="hint">Exports a static web page of your collection with <b>all price data removed</b> (paid, RRP, current values, P&amp;L, wishlist targets).</p>
         <div class="row"><button class="btn red" type="button" id="ex">${s.githubPublish ? 'Export &amp; publish' : 'Export view-only snapshot'}</button><button class="btn" type="button" id="exo">Open folder</button></div>
