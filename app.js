@@ -21,15 +21,8 @@
   // ---------- helpers ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const gbp = (n, dp = 0) => n == null || isNaN(n) ? '—' : (n < 0 ? '−£' : '£') + Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp });
-  const yen = (n) => n == null ? '—' : '¥' + Number(n).toLocaleString('en-GB');
   const signed = (n) => n == null ? '—' : (n > 0 ? '+' : '') + gbp(n);
   const pct = (n) => n == null || !isFinite(n) ? '' : (n > 0 ? '+' : '') + n.toFixed(0) + '%';
-  const rate = () => (DB.settings && DB.settings.jpyPerGbp) || 200;
-  const rrpGbp = (it) => it.rrpJpy ? it.rrpJpy / rate() : null;
-  const rrpUnknown = (it) => !it.rrpJpy;
-  // green if you paid under RRP, red if over, plain if about the same
-  const rrpCls = (it) => rrpUnknown(it) || it.gift || it.paid == null ? '' : Math.abs(cost(it) - rrpGbp(it)) < 0.5 ? '' : cost(it) > rrpGbp(it) ? 'loss' : 'gain';
-  const rrpText = (it) => rrpUnknown(it) ? '—' : gbp(rrpGbp(it));
   const cost = (it) => it.gift ? 0 : (it.paid || 0);
   const value = (it) => it.current && it.current.gbp != null ? it.current.gbp : null;
   const pl = (it) => value(it) == null ? null : value(it) - cost(it);
@@ -98,7 +91,7 @@
     let items = DB.items.filter((i) => i.list === list);
     const counts = { All: items.length };
     for (const i of items) counts[i.grade] = (counts[i.grade] || 0) + 1;
-    if (q) items = items.filter((i) => [i.title, i.series, i.grade, gradeName(i.grade), i.notes, i.scale, rrpUnknown(i) ? 'unknown rrp' : ''].join(' ').toLowerCase().includes(q));
+    if (q) items = items.filter((i) => [i.title, i.series, i.grade, gradeName(i.grade), i.notes, i.scale].join(' ').toLowerCase().includes(q));
     if (state.grade !== 'All') items = items.filter((i) => i.grade === state.grade);
     if (state.review && !VIEW) items = items.filter(needsCheck);
     const key = {
@@ -110,7 +103,6 @@
       value: (i) => value(i) || 0,
       pl: (i) => pl(i) || 0,
       plpct: (i) => plPct(i) || 0,
-      rrp: (i) => i.rrpJpy || 0,
     }[state.sort] || ((i) => i.title);
     items.sort((a, b) => { const x = key(a), y = key(b); return (x > y ? 1 : x < y ? -1 : a.title.localeCompare(b.title)) * state.dir; });
     return { items, counts };
@@ -136,7 +128,7 @@
     const chips = ['All', ...GRADE_ORDER.filter((g) => counts[g])].map((g) =>
       `<button class="chip ${state.grade === g ? 'on' : ''}" data-grade="${g}">${g === 'All' ? 'All' : `<span class="grade g-${g}" style="height:16px;min-width:26px;font-size:11px">${g}</span>`}<span class="n">${counts[g] || 0}</span></button>`).join('');
     const sorts = [['grade', 'Grade'], ['name', 'Name'], ['series', 'Series'], ['added', 'Date added']];
-    if (!VIEW) sorts.push(list === 'wishlist' ? ['paid', 'Target price'] : ['paid', 'Price paid'], ['value', 'Current value'], ['rrp', 'RRP']);
+    if (!VIEW) sorts.push(list === 'wishlist' ? ['paid', 'Target price'] : ['paid', 'Price paid'], ['value', 'Current value']);
     if (!VIEW && list === 'collection') sorts.push(['pl', 'Profit / loss £'], ['plpct', 'Profit / loss %']);
     return `<div class="toolbar">
       <div class="search">${ICON.search}<input id="q" placeholder="Search ${list === 'wishlist' ? 'wishlist' : 'collection'} — name, series, grade…" value="${esc(state.q)}">${state.q ? '<button class="search-x" id="qx" type="button" title="Clear search" aria-label="Clear search">✕</button>' : ''}</div>
@@ -158,7 +150,7 @@
       } else {
         const p = pl(it);
         if (p != null) plTag = `<span class="pl-pill on-img ${cls(p)}">${signed(p)}</span>`;
-        money = `<div class="card-money cm-row"><span class="now">${gbp(value(it))}</span><span class="was">${it.gift ? 'gift' : 'paid ' + gbp(cost(it))}${rrpUnknown(it) ? '' : ` · RRP ${rrpText(it)}`}</span></div>`;
+        money = `<div class="card-money cm-row"><span class="now">${gbp(value(it))}</span><span class="was">${it.gift ? 'gift' : 'paid ' + gbp(cost(it))}</span></div>`;
       }
     }
     return `<a class="card" href="#/item/${it.id}" style="--card-accent:${accent}">
@@ -170,8 +162,8 @@
   function table(items, list) {
     const cols = [['', null], ['Grade', 'grade'], ['Name', 'name'], ['Scale', null], ['Series', 'series']];
     if (!VIEW) {
-      if (list === 'wishlist') cols.push(['Target', 'paid', 1], ['RRP', 'rrp', 1], ['Current', 'value', 1]);
-      else cols.push(['Paid', 'paid', 1], ['RRP', 'rrp', 1], ['Current', 'value', 1], ['P/L', 'pl', 1], ['P/L %', 'plpct', 1]);
+      if (list === 'wishlist') cols.push(['Target', 'paid', 1], ['Current', 'value', 1]);
+      else cols.push(['Paid', 'paid', 1], ['Current', 'value', 1], ['P/L', 'pl', 1], ['P/L %', 'plpct', 1]);
     }
     const head = cols.map(([l, k, n]) => `<th class="${n ? 'num' : ''}" ${k ? `data-sort="${k}"` : ''}>${l}${state.sort === k ? (state.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('');
     const rows = items.map((it) => {
@@ -179,8 +171,8 @@
       let tds = `<td>${src ? `<img class="thumb" src="${esc(src)}" ${it.image && it.image.thumb && !it.image.local ? `data-fallback="${esc(it.image.thumb)}"` : ''} referrerpolicy="no-referrer" loading="lazy" alt="">` : ''}</td>
         <td><span class="grade g-${it.grade}">${it.grade}</span></td><td>${esc(it.title)}${it.qty > 1 ? ' ×' + it.qty : ''}${it.limited ? ' <span class="model-no">LTD</span>' : ''}</td><td class="model-no">${esc(it.scale || '')}</td><td>${esc(it.series || '')}</td>`;
       if (!VIEW) {
-        if (list === 'wishlist') tds += `<td class="num">${gbp(it.targetPrice)}</td><td class="num">${rrpText(it)}</td><td class="num">${gbp(value(it))}</td>`;
-        else tds += `<td class="num">${it.gift ? 'Gift' : gbp(cost(it))}</td><td class="num ${rrpCls(it)}">${rrpText(it)}</td><td class="num">${gbp(value(it))}</td><td class="num ${cls(pl(it))}">${signed(pl(it))}</td><td class="num ${cls(pl(it))}">${pct(plPct(it))}</td>`;
+        if (list === 'wishlist') tds += `<td class="num">${gbp(it.targetPrice)}</td><td class="num">${gbp(value(it))}</td>`;
+        else tds += `<td class="num">${it.gift ? 'Gift' : gbp(cost(it))}</td><td class="num">${gbp(value(it))}</td><td class="num ${cls(pl(it))}">${signed(pl(it))}</td><td class="num ${cls(pl(it))}">${pct(plPct(it))}</td>`;
       }
       return `<tr data-id="${it.id}">${tds}</tr>`;
     }).join('');
@@ -241,14 +233,12 @@
     let money = '';
     if (!VIEW) {
       const c = it.current || {};
-      const rrpLine = `<div><div class="k">RRP (Japan list price)</div><div class="v">${rrpText(it)}</div><div class="s">${rrpUnknown(it) ? esc((it.rrpSource || '').replace(/^\[unknown\]\s*–?\s*/, '')) : yen(it.rrpJpy) + (it.rrpSource ? ' · ' + esc(it.rrpSource) : '')}${it.rrpUrl ? ' · <a href="#" id="rrpsrc">source</a>' : ''}${rrpProvisional(it) ? ' · <a href="#" id="rrpok" title="Mark this RRP as checked">OK?</a>' : ''}</div><div class="s"><a href="#" id="findrrp">Update RRP</a></div></div>`;
       const curLine = `<div><div class="k">Current value</div><div class="v">${gbp(value(it))}</div><div class="s">${esc(c.source || 'not priced')}${c.samples ? ' · ' + c.samples + ' listings' : ''}</div></div>`;
       if (it.list === 'wishlist') {
-        money = `<div class="money"><div><div class="k">Target price</div><div class="v">${gbp(it.targetPrice)}</div><div class="s">from your list</div></div>${curLine}${rrpLine}</div>`;
+        money = `<div class="money"><div><div class="k">Target price</div><div class="v">${gbp(it.targetPrice)}</div><div class="s">from your list</div></div>${curLine}</div>`;
       } else {
         const p = pl(it);
-        money = `<div class="money"><div><div class="k">Price paid</div><div class="v">${it.gift ? 'Gift' : gbp(cost(it), 2)}</div><div class="s">${it.gift ? 'counted as £0' : ''}</div></div>${curLine}<div class="pl"><span class="k">Profit / loss</span><span class="v ${cls(p)}">${signed(p)} <span style="font-size:14px">${pct(plPct(it))}</span></span></div>${rrpLine}
-          <div><div class="k">vs RRP</div><div class="v ${cls(it.rrpJpy && Math.abs(rrpGbp(it) - cost(it)) >= 0.5 ? rrpGbp(it) - cost(it) : null)}" style="font-size:18px">${rrpUnknown(it) ? '—' : it.rrpJpy && !it.gift ? (Math.abs(cost(it) - rrpGbp(it)) < 0.5 ? 'Paid RRP' : cost(it) > rrpGbp(it) ? 'Paid ' + gbp(cost(it) - rrpGbp(it)) + ' over' : 'Paid ' + gbp(rrpGbp(it) - cost(it)) + ' under') : '—'}</div></div></div>`;
+        money = `<div class="money"><div><div class="k">Price paid</div><div class="v">${it.gift ? 'Gift' : gbp(cost(it), 2)}</div><div class="s">${it.gift ? 'counted as £0' : ''}</div></div>${curLine}<div class="pl"><span class="k">Profit / loss</span><span class="v ${cls(p)}">${signed(p)} <span style="font-size:14px">${pct(plPct(it))}</span></span></div></div>`;
       }
     }
     const actions = VIEW ? '' : `<div class="actions">
@@ -279,9 +269,6 @@
     if (VIEW) return;
     document.getElementById('edit').onclick = () => editForm(it);
     document.getElementById('photo').onclick = () => photoPicker(it);
-    const fr = document.getElementById('findrrp'); if (fr) fr.onclick = (e) => { e.preventDefault(); rrpIntro(it.limited, () => rrpPicker(it, async (c) => { await applyRrp(it, c); renderItem(it.id); })); };
-    const ok = document.getElementById('rrpok'); if (ok) ok.onclick = async (e) => { e.preventDefault(); await API.saveItem({ ...it, rrpSource: 'verified' }); DB = await API.getDB(); toast('RRP marked as checked'); renderItem(it.id); };
-    const rs = document.getElementById('rrpsrc'); if (rs) rs.onclick = (e) => { e.preventDefault(); API.openUrl(it.rrpUrl); };
     document.getElementById('reprice').onclick = async () => { DB = await API.refreshPrices([it.id]); toast('Price refreshed'); renderItem(id); };
     document.getElementById('del').onclick = async () => { if (await API.deleteItem(it.id)) { DB = await API.getDB(); location.hash = backHref; } };
     const g = document.getElementById('gotit');
@@ -301,9 +288,7 @@
            <label class="span-2">Where to buy<input class="input" name="whereToBuy" value="${esc(d.whereToBuy || '')}"></label>`
         : `<label class="span-2">Price paid (£)<input class="input" name="paid" type="number" step="0.01" value="${d.gift ? '' : (d.paid ?? '')}"></label>
            <label class="span-2 check"><input type="checkbox" name="gift" ${d.gift ? 'checked' : ''}> Gift (counts as £0)</label>`}
-      <label class="span-2">RRP (¥, Japan list price)<input class="input" name="rrpJpy" type="number" step="1" value="${d.rrpJpy ?? ''}" placeholder="—"></label>
       <label class="span-2 check"><input type="checkbox" name="limited" ${d.limited ? 'checked' : ''}> Limited / exclusive</label>
-      <label class="span-2 check"><input type="checkbox" name="rrpVerified" ${d.rrpSource === 'verified' ? 'checked' : ''}> RRP checked by me</label>
       <label class="span-2">Date added<input class="input" name="added" type="date" value="${esc(d.added || new Date().toISOString().slice(0, 10))}"></label>
       <label class="span-6">Notes<textarea name="notes" rows="2">${esc(d.notes || '')}</textarea></label>
     </div>`;
@@ -313,10 +298,6 @@
     o.title = (f.get('title') || '').trim(); o.grade = f.get('grade'); o.scale = (f.get('scale') || '').trim(); o.series = (f.get('series') || '').trim();
     o.qty = Math.max(1, parseInt(f.get('qty') || '1', 10)); o.notes = (f.get('notes') || '').trim(); o.added = f.get('added');
     o.limited = !!f.get('limited');
-    const r = f.get('rrpJpy'); o.rrpJpy = r === '' ? null : Number(r);
-    if (o.rrpJpy == null) o.rrpSource = '[unknown]';
-    else if (f.get('rrpVerified') || o.rrpJpy !== base.rrpJpy) { o.rrpSource = 'verified'; if (o.rrpJpy !== base.rrpJpy) delete o.rrpUrl; }
-    else if (o.rrpSource === 'verified' || /^\[unknown\]/.test(o.rrpSource || '')) o.rrpSource = 'entered manually';
     if (o.list === 'wishlist') { const t = f.get('targetPrice'); o.targetPrice = t === '' ? null : Number(t); o.whereToBuy = (f.get('whereToBuy') || '').trim(); }
     else { o.gift = !!f.get('gift'); const p = f.get('paid'); o.paid = o.gift || p === '' ? null : Number(p); }
     return o;
@@ -376,87 +357,6 @@
     paint();
   }
 
-  // ---------- RRP lookup ----------
-  const rrpProvisional = (i) => !rrpUnknown(i) && i.rrpSource !== 'verified' && /check|suggested|may differ|grade default/i.test(i.rrpSource || '');
-  function rrpIntro(limited, go, title = 'Update RRP', lead = '', yes = 'Continue', no = 'Cancel') {
-    const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal" style="width:min(480px,100%)"><div class="modal-head"><h3>${title}</h3><button class="icon-btn" id="x">✕</button></div><div class="modal-body">
-      <p style="margin-top:0">${lead}${limited ? 'This kit is marked as limited / exclusive, so it probably isn’t listed. ' : ''}RRPs come from Bic Camera, which only lists standard retail kits. Limited editions, event and Gundam Base exclusives, Premium Bandai, gashapon and other non-retail items may not return a price.</p>
-      <div class="row" style="margin-top:16px"><button class="btn primary" id="go">${yes}</button><button class="btn" id="no">${no}</button></div></div></div>`;
-    document.body.appendChild(bg);
-    const close = () => bg.remove();
-    bg.querySelector('#x').onclick = close; bg.querySelector('#no').onclick = close; bg.onclick = (e) => { if (e.target === bg) close(); };
-    bg.querySelector('#go').onclick = () => { close(); go(); };
-  }
-  async function applyRrp(it, c) {
-    const o = { ...DB.items.find((x) => x.id === it.id) || it, rrpJpy: c.priceJpy, rrpSource: 'suggested (Bic Camera)', rrpUrl: c.url };
-    await API.saveItem(o); DB = await API.refreshPrices([o.id]); return o;
-  }
-  function candRow(c, i, best) {
-    return `<div class="rrp-cand${i === 0 && best ? ' best' : ''}"><div class="rrp-t">${esc(c.title)}<div class="model-no">${c.released ? 'Released ' + esc(c.released) + ' · ' : ''}match score ${c.score}</div></div>
-      <div class="rrp-p">${yen(c.priceJpy)}<div class="model-no">${gbp(c.priceJpy / rate())}</div></div>
-      <div class="rrp-b"><button class="btn" type="button" data-view="${i}">View</button><button class="btn primary" type="button" data-use="${i}">Use</button></div></div>`;
-  }
-  function rrpPicker(it, onUse) {
-    const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal"><div class="modal-head"><h3>Update RRP</h3><button class="icon-btn" id="x">✕</button></div><div class="modal-body">
-      <div class="row"><input class="input" id="rq" style="flex:1" value="${esc(it.title)}"><button class="btn primary" id="rs">Search again</button></div>
-      <p class="hint" style="margin:10px 0">Official maker price (tax incl.) from Bic Camera. Check it's the same kit before using it.</p><div id="rl"></div></div></div>`;
-    document.body.appendChild(bg);
-    const close = () => bg.remove(); bg.querySelector('#x').onclick = close; bg.onclick = (e) => { if (e.target === bg) close(); };
-    const run = async (title) => {
-      const rl = bg.querySelector('#rl'); rl.innerHTML = '<div class="empty">Searching Bic Camera…</div>';
-      let r; try { r = await API.findRrp({ ...it, title }); } catch (e) { rl.innerHTML = '<div class="empty">Search failed — check your connection.</div>'; return; }
-      if (!document.body.contains(bg)) return;
-      if (!r.candidates.length) { rl.innerHTML = `<div class="empty">No priced match found for “${esc(r.query)}”. Try a simpler name, or the Japanese name.</div>`; return; }
-      rl.innerHTML = `<div class="model-no" style="margin-bottom:6px">Searched: ${esc(r.query)}</div>` + r.candidates.map((c, i) => candRow(c, i, true)).join('');
-      rl.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => API.openUrl(r.candidates[+b.dataset.view].url));
-      rl.querySelectorAll('[data-use]').forEach((b) => b.onclick = async () => { b.disabled = true; await onUse(r.candidates[+b.dataset.use]); close(); toast('RRP updated'); });
-    };
-    bg.querySelector('#rs').onclick = () => run(bg.querySelector('#rq').value.trim());
-    run(it.title);
-  }
-  function bulkRrp() {
-    const todo = DB.items.filter((i) => rrpUnknown(i) && !/never sold/.test(i.rrpSource || ''));
-    if (!todo.length) { toast('Every kit already has an RRP'); return; }
-    const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal" style="width:min(1000px,100%)"><div class="modal-head"><h3>Update missing RRPs</h3><button class="icon-btn" id="x">✕</button></div><div class="modal-body">
-      <p class="hint" style="margin-top:0">Looking up ${todo.length} kits on Bic Camera, one at a time (about 10 seconds each). Strong matches are ticked; check each before applying.</p>
-      <div class="row" style="margin-bottom:12px"><span class="progress" id="bp">Starting…</span><span class="spacer" style="flex:1"></span><button class="btn" id="stop" disabled>Stop</button><button class="btn primary" id="apply" disabled>Apply ticked</button></div>
-      <table class="list" style="box-shadow:none"><thead><tr><th></th><th>Your kit</th><th>Best match on Bic Camera</th><th class="num">RRP</th><th></th></tr></thead><tbody id="bt"></tbody></table></div></div>`;
-    document.body.appendChild(bg);
-    let stopped = false; const found = {};
-    const close = () => { stopped = true; bg.remove(); if (location.hash.startsWith('#/settings')) renderSettings(); };
-    bg.querySelector('#x').onclick = close; bg.querySelector('#stop').onclick = (e) => { stopped = true; e.target.disabled = true; };
-    const tb = bg.querySelector('#bt');
-    tb.innerHTML = todo.map((it) => `<tr data-id="${it.id}"><td><input type="checkbox" disabled></td><td>${esc(it.title)}</td><td class="m model-no">waiting</td><td class="num p"></td><td class="v"></td></tr>`).join('');
-    (async () => {
-      let n = 0; bg.querySelector('#stop').disabled = false;
-      for (const it of todo) {
-        if (stopped) break;
-        const tr = tb.querySelector(`tr[data-id="${it.id}"]`); tr.querySelector('.m').textContent = 'searching…';
-        bg.querySelector('#bp').textContent = `Checking ${++n} of ${todo.length}`;
-        try {
-          const r = await API.findRrp(it); const c = r.candidates[0];
-          if (!document.body.contains(bg)) return;
-          if (c) {
-            found[it.id] = c; const cb = tr.querySelector('input'); cb.disabled = false; cb.checked = c.score >= 8;
-            tr.querySelector('.m').innerHTML = `<span style="font-family:var(--font);font-size:13px;color:var(--ink)">${esc(c.title)}</span><br>score ${c.score}`;
-            tr.querySelector('.p').textContent = yen(c.priceJpy);
-            tr.querySelector('.v').innerHTML = '<a href="#">view</a>'; tr.querySelector('.v a').onclick = (e) => { e.preventDefault(); API.openUrl(c.url); };
-          } else tr.querySelector('.m').textContent = 'no match';
-        } catch (e) { tr.querySelector('.m').textContent = 'search failed'; }
-        bg.querySelector('#apply').disabled = !Object.keys(found).length;
-      }
-      if (document.body.contains(bg)) { bg.querySelector('#bp').textContent = stopped ? 'Stopped' : 'Done'; bg.querySelector('#stop').disabled = true; }
-    })();
-    bg.querySelector('#apply').onclick = async (e) => {
-      e.target.disabled = true; let k = 0;
-      for (const tr of tb.querySelectorAll('tr')) { const cb = tr.querySelector('input'); const c = found[tr.dataset.id]; if (cb.checked && c) { await applyRrp(DB.items.find((x) => x.id === tr.dataset.id), c); k++; } }
-      toast(`${k} RRP${k === 1 ? '' : 's'} applied`); close();
-    };
-  }
-
   // ---------- update details from the (corrected) name ----------
   async function relookup(it, afterRename) {
     const bg = document.createElement('div'); bg.className = 'modal-bg';
@@ -467,13 +367,11 @@
     bg.querySelector('#x').onclick = close;
     let auto;
     try { auto = await API.autofill(it.title); } catch (e) { auto = { ...M.parseName(it.title), imageCandidates: [] }; }
-    auto.rrpJpy = null; // RRP is offered separately after applying
     if (!document.body.contains(bg)) return;
-    const fmt = { rrpJpy: yen, limited: (v) => v ? 'Limited' : 'Standard' };
-    const rows = [['grade', 'Grade'], ['scale', 'Scale'], ['series', 'Series'], ['limited', 'Edition'], ['rrpJpy', 'RRP']]
+    const fmt = { limited: (v) => v ? 'Limited' : 'Standard' };
+    const rows = [['grade', 'Grade'], ['scale', 'Scale'], ['series', 'Series'], ['limited', 'Edition']]
       .filter(([k]) => auto[k] !== undefined && auto[k] !== null && auto[k] !== '' && auto[k] !== it[k])
       .map(([k, l]) => {
-        // RRP from a lookup is only a grade default: don't pre-tick it if the current one is verified or the grade is unchanged
         const on = true;
         const f = fmt[k] || ((v) => esc(v || '—'));
         return `<tr><td><label class="check" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}> ${l}</label></td><td>${f(it[k])}</td><td><b>${f(auto[k])}</b></td></tr>`;
@@ -502,8 +400,6 @@
       if (chosen && !bg.querySelector('#keep').checked) await API.setImage(o.id, chosen);
       DB = await API.refreshPrices([o.id]);
       close(); toast('Updated'); renderItem(o.id);
-      const fresh = DB.items.find((x) => x.id === o.id) || o;
-      rrpIntro(fresh.limited, () => rrpPicker(fresh, async (c) => { await applyRrp(fresh, c); renderItem(o.id); }), 'Update the RRP too?', 'This takes about 10 seconds. ', 'Update RRP', 'Not now');
     };
   }
 
@@ -557,7 +453,7 @@
       const list = f.get('list'); const price = f.get('paid') === '' ? null : Number(f.get('paid'));
       const draft = {
         id: newId(list === 'wishlist' ? 'w' : 'c'), list, title: auto.title, grade: auto.grade, scale: auto.scale, series: auto.series,
-        limited: auto.limited, qty: 1, notes: '', original: f.get('name'), rrpJpy: auto.rrpJpy, rrpSource: auto.rrpSource || 'grade default',
+        limited: auto.limited, qty: 1, notes: '', original: f.get('name'),
         gift: list === 'collection' && !!f.get('gift'), paid: list === 'collection' && !f.get('gift') ? price : null,
         targetPrice: list === 'wishlist' ? price : undefined, image: null, imageCandidates: auto.imageCandidates || [], added: new Date().toISOString().slice(0, 10),
       };
@@ -565,24 +461,14 @@
       const rv = document.getElementById('review');
       const paintCands = () => `<div class="cands">${draft.imageCandidates.slice(0, 12).map((c, i) => `<button type="button" class="cand ${chosen === c ? 'sel' : ''}" data-i="${i}"><img src="${esc(c.th || c.u)}" data-fallback="${esc(c.u)}" referrerpolicy="no-referrer" alt=""><span>${esc(c.t)}</span></button>`).join('') || '<div class="empty">No photos found — you can add one after saving.</div>'}</div>`;
       rv.innerHTML = `<form id="rf"><div class="section-title">Check the details</div>${fieldsHTML(draft, list)}
-        <div class="note" id="rrpsug">Looking up RRP on Bic Camera…</div>
-        <div class="note">RRP starts blank — enter the Japanese list price if you know it. Current value uses ${DB.settings.priceProvider === 'ebay' ? 'eBay UK listings' : 'dummy data until eBay access is approved'}.</div>
+        <div class="note">Current value uses ${DB.settings.priceProvider === 'ebay' ? 'eBay UK listings' : 'dummy data until eBay access is approved'}.</div>
         <div class="section-title">Pick a photo</div><div id="cw">${paintCands()}</div>
         <div class="row" style="margin-top:18px"><button class="btn primary" type="submit">Save to ${list}</button></div></form>`;
-      let pickedRrp = null;
-      const showSug = (c) => { const el = document.getElementById('rrpsug'); if (!el) return;
-        if (!c) { el.innerHTML = 'No RRP found automatically. <a href="#" id="rrpmore">Search manually</a>'; }
-        else el.innerHTML = `Suggested RRP <b>${yen(c.priceJpy)}</b> from “${esc(c.title)}” <a href="#" id="rrpuse">Use</a> · <a href="#" id="rrpmore">Other matches</a>`;
-        const u = document.getElementById('rrpuse'); if (u) u.onclick = (e) => { e.preventDefault(); setR(c); };
-        document.getElementById('rrpmore').onclick = (e) => { e.preventDefault(); rrpPicker({ ...draft, title: document.querySelector('#rf [name=title]').value }, async (cc) => setR(cc)); }; };
-      const setR = (c) => { pickedRrp = c; document.querySelector('#rf [name=rrpJpy]').value = c.priceJpy; document.getElementById('rrpsug').innerHTML = `RRP set to <b>${yen(c.priceJpy)}</b> from Bic Camera.`; };
-      API.findRrp(draft).then((r) => showSug(r.candidates[0] && r.candidates[0].score >= 4 ? r.candidates[0] : null)).catch(() => showSug(null));
       const bindC = () => document.querySelectorAll('#cw .cand').forEach((b) => b.onclick = () => { chosen = draft.imageCandidates[+b.dataset.i]; document.getElementById('cw').innerHTML = paintCands(); bindC(); });
       bindC();
       document.getElementById('rf').onsubmit = async (ev) => {
         ev.preventDefault();
         const o = readFields(ev.target, draft);
-        if (pickedRrp && o.rrpJpy === pickedRrp.priceJpy && !new FormData(ev.target).get('rrpVerified')) { o.rrpSource = 'suggested (Bic Camera)'; o.rrpUrl = pickedRrp.url; }
         await API.saveItem(o);
         if (chosen) await API.setImage(o.id, chosen);
         DB = await API.refreshPrices([o.id]);
@@ -597,17 +483,15 @@
     $app.innerHTML = `<div class="settings-grid">
       <form class="panel" id="sf"><h2>Prices</h2><p class="hint">Where “current value” comes from.</p>
         <div class="form">
-          <label class="span-6 check"><input type="radio" name="priceProvider" value="dummy" ${s.priceProvider !== 'ebay' ? 'checked' : ''}> Dummy data (placeholder values derived from RRP)</label>
+          <label class="span-6 check"><input type="radio" name="priceProvider" value="dummy" ${s.priceProvider !== 'ebay' ? 'checked' : ''}> Dummy data (placeholder values based on what you paid)</label>
           <label class="span-6 check"><input type="radio" name="priceProvider" value="ebay" ${s.priceProvider === 'ebay' ? 'checked' : ''}> eBay UK — median asking price of new, Buy It Now listings</label>
           <label class="span-3">eBay App ID (Client ID)<input class="input" name="ebayAppId" value="${esc(s.ebayAppId || '')}" autocomplete="off"></label>
           <label class="span-3">eBay Cert ID (Client Secret)<input class="input" name="ebayCertId" type="password" value="${esc(s.ebayCertId || '')}" autocomplete="off"></label>
-          <label class="span-3">Yen per £1<input class="input" name="jpyPerGbp" type="number" step="0.01" value="${s.jpyPerGbp || 200}"></label>
-          <div class="span-3" style="align-self:end"><button class="btn" type="button" id="fx">Update rate online</button></div>
         </div>
-        <p class="hint" style="margin-top:10px">${s.fxUpdated ? 'Rate updated ' + esc(s.fxUpdated) : 'Rate not yet updated online'} · keys are stored only in your local data file.</p>
+        <p class="hint" style="margin-top:10px">eBay keys are stored only in your local data file.</p>
         <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="rp">Refresh all values</button></div>
       </form>
-      <form class="panel" id="gf2"><h2>View-only page</h2><p class="hint">Exports a static web page of your collection with <b>all price data removed</b> (paid, RRP, current values, P&amp;L, wishlist targets).</p>
+      <form class="panel" id="gf2"><h2>View-only page</h2><p class="hint">Exports a static web page of your collection with <b>all price data removed</b> (paid, current values, P&amp;L, wishlist targets).</p>
         <div class="row"><button class="btn red" type="button" id="ex">${s.githubPublish ? 'Export &amp; publish' : 'Export view-only snapshot'}</button><button class="btn" type="button" id="exo">Open folder</button></div>
         <p class="hint" style="margin-top:12px">Saved to: <span class="model-no">${esc(paths.view)}</span></p>
         <div class="section-title">Publish to GitHub</div>
@@ -625,9 +509,6 @@
         <div class="row"><button class="btn" id="ci">Download any missing photos</button></div>
         <p class="hint" style="margin-top:12px">Photos to check (missing, or auto-matched with low confidence): <a href="#/" id="chk-c">${DB.items.filter((i) => i.list === 'collection' && needsCheck(i)).length} in collection</a> · <a href="#/wishlist" id="chk-w">${DB.items.filter((i) => i.list === 'wishlist' && needsCheck(i)).length} in wishlist</a>. Picking a new photo clears the flag.</p>
       </div>
-      <div class="panel"><h2>RRP lookup</h2><p class="hint">Finds official maker prices (tax incl.) on Bic Camera for kits with no RRP. Works best for standard kits; event exclusives and gashapon usually aren't listed.</p>
-        <div class="row"><button class="btn primary" id="bulkrrp">Update missing RRPs</button><span class="model-no">${DB.items.filter((i) => rrpUnknown(i)).length} without an RRP</span></div>
-      </div>
       <div class="panel"><h2>Data</h2><p class="hint">Everything lives in one JSON file plus an images folder. A backup of the previous version is kept on every save.</p>
         <div class="row"><button class="btn" id="od">Open data folder</button></div>
         <p class="hint" style="margin-top:12px"><span class="model-no">${esc(paths.data)}</span></p>
@@ -635,11 +516,10 @@
     </div>${foot()}`;
     document.getElementById('sf').onsubmit = async (e) => {
       e.preventDefault(); const f = new FormData(e.target);
-      const ns = { priceProvider: f.get('priceProvider'), ebayAppId: f.get('ebayAppId').trim(), ebayCertId: f.get('ebayCertId').trim(), jpyPerGbp: Number(f.get('jpyPerGbp')) || 200 };
+      const ns = { priceProvider: f.get('priceProvider'), ebayAppId: f.get('ebayAppId').trim(), ebayCertId: f.get('ebayCertId').trim() };
       if (ns.priceProvider === 'ebay' && (!ns.ebayAppId || !ns.ebayCertId)) { toast('Add both eBay keys first — staying on dummy data'); ns.priceProvider = 'dummy'; }
       DB.settings = await API.saveSettings(ns); toast('Settings saved'); renderTabs('settings');
     };
-    document.getElementById('fx').onclick = async () => { DB.settings = await API.refreshFx(); toast('Rate: ¥' + DB.settings.jpyPerGbp + ' per £'); renderSettings(); };
     document.getElementById('rp').onclick = async (e) => { e.target.disabled = true; e.target.textContent = 'Refreshing…'; DB = await API.refreshPrices(); toast('Prices refreshed'); renderSettings(); };
     const doExport = async (publish) => {
       const st = document.getElementById('ghstatus'); st.textContent = publish ? 'Exporting and publishing to GitHub…' : 'Exporting…';
@@ -660,7 +540,6 @@
     document.getElementById('exo').onclick = () => API.openPath(paths.view);
     document.getElementById('od').onclick = () => API.openPath(paths.data);
     ['chk-c', 'chk-w'].forEach((id) => document.getElementById(id).onclick = () => { state.review = true; state.grade = 'All'; state.q = ''; saveUI(); });
-    document.getElementById('bulkrrp').onclick = () => rrpIntro(false, bulkRrp);
     document.getElementById('ci').onclick = () => { API.cacheImages(); toast('Downloading photos in the background'); };
   }
 

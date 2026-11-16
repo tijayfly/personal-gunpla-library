@@ -3,16 +3,16 @@
 (function (root) {
   const GRADES = ['PGU', 'PG', 'MG', 'RG', 'HG', 'EG', 'SD', 'FM', 'AG', 'Mega', 'Other'];
   const GRADE_INFO = {
-    PG:   { name: 'Perfect Grade',   scale: '1/60',  rrp: 16500 },
-    MG:   { name: 'Master Grade',    scale: '1/100', rrp: 5500 },
-    RG:   { name: 'Real Grade',      scale: '1/144', rrp: 3300 },
-    HG:   { name: 'High Grade',      scale: '1/144', rrp: 2200 },
-    EG:   { name: 'Entry Grade',     scale: '1/144', rrp: 990 },
-    SD:   { name: 'Super Deformed',  scale: '',      rrp: 990 },
-    FM:   { name: 'Full Mechanics',  scale: '1/100', rrp: 4950 },
-    AG:   { name: 'Advanced Grade',  scale: '1/144', rrp: 660 },
-    Mega: { name: 'Mega Size',       scale: '1/48',  rrp: 11000 },
-    Other:{ name: 'Other / Limited', scale: '',      rrp: 1650 },
+    PG:   { name: 'Perfect Grade',   scale: '1/60' },
+    MG:   { name: 'Master Grade',    scale: '1/100' },
+    RG:   { name: 'Real Grade',      scale: '1/144' },
+    HG:   { name: 'High Grade',      scale: '1/144' },
+    EG:   { name: 'Entry Grade',     scale: '1/144' },
+    SD:   { name: 'Super Deformed',  scale: '' },
+    FM:   { name: 'Full Mechanics',  scale: '1/100' },
+    AG:   { name: 'Advanced Grade',  scale: '1/144' },
+    Mega: { name: 'Mega Size',       scale: '1/48' },
+    Other:{ name: 'Other / Limited', scale: '' },
   };
   const SERIES_HINTS = [
     [/aerial|calibarn|lfrith|witch from mercury|darilbalde|pharact/i, 'The Witch from Mercury'],
@@ -64,7 +64,7 @@
     let series = '';
     for (const [re, name] of SERIES_HINTS) if (re.test(s)) { series = name; break; }
     const limited = /p-?bandai|premium bandai|gundam base|limited|exclusive|side-?f|yokohama|expo|clear|coating|ecopla/i.test(s);
-    return { title, grade, scale, series, limited, rrpJpy: GRADE_INFO[grade].rrp };
+    return { title, grade, scale, series, limited };
   }
 
   const NOISE = /\b(review|reddit|r\/gunpla|tiktok|wiki|fandom|blog|youtube|painted|custom set|decal|water ?decal|g-rework|revealed|news|restock|3d print|wallpaper)\b/i;

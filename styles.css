@@ -268,14 +268,7 @@ table.list td.num { white-space: nowrap; }
   .foot { font-size: 10.5px; }
 }
 
-/* RRP lookup */
-.rrp-cand { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); margin-bottom: 8px; background: var(--panel-2); }
-.rrp-cand.best { border-color: var(--blue-2); }
-.rrp-t { font-size: 13.5px; line-height: 1.35; }
-.rrp-p { font-size: 18px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.rrp-b { display: flex; gap: 6px; }
 .money a, .note a { color: var(--blue-2); }
-@media (max-width: 640px) { .rrp-cand { grid-template-columns: 1fr auto; } .rrp-b { grid-column: 1 / -1; } }
 .pl-pill { white-space: nowrap; }
 .card-money.cm-row { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: baseline; gap: 4px 8px; }
 .card-money.cm-row .was { white-space: nowrap; }
