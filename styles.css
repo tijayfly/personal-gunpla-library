@@ -300,3 +300,15 @@ table.list td.num { white-space: nowrap; }
 .btn.go { background: #0f8a4b; border-color: #0f8a4b; color: #fff; }
 .btn.go:hover { background: #0c7340; border-color: #0c7340; }
 .actions .btn.go { grid-column: 1 / -1; }
+.search input { padding-right: 34px; }
+.search-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border: 0; background: transparent; color: var(--ink-3); font-size: 13px; cursor: pointer; display: grid; place-items: center; }
+.search-x:hover { color: var(--ink); background: var(--panel-2); }
+/* view mode (snapshot and preview) */
+.view-btn { color: var(--ink-3); margin-right: 6px; }
+.view-btn.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.view-mode .card-img .grade, .view-mode .card-img .scale { top: 10px; }
+.card-img .flag.pill { top: auto; right: auto; bottom: 8px; left: 12px; padding: 2px 6px; letter-spacing: .06em; }
+@media (max-width: 640px) {
+  .view-mode .card-img .grade, .view-mode .card-img .scale { top: 6px; }
+  .card-img .flag.pill { bottom: 6px; left: 8px; }
+}

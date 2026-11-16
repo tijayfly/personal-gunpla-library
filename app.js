@@ -2,7 +2,8 @@
 (function () {
   'use strict';
   const API = window.hangar || null;                 // present only in the Electron full version
-  const VIEW = !API;                                 // view-only snapshot (no prices, no editing)
+  const SNAP = !API;                                 // the exported view-only snapshot
+  let VIEW = SNAP;                                   // view mode: no prices, no editing (snapshot, or previewed in the full app)
   const M = window.Match;
   const $app = document.getElementById('app');
   const GRADE_ORDER = ['PG', 'MG', 'RG', 'HG', 'FM', 'Mega', 'EG', 'AG', 'SD', 'Other'];
@@ -38,7 +39,7 @@
   const cls = (n) => n == null ? '' : n > 0 ? 'gain' : n < 0 ? 'loss' : '';
   function imgSrc(it) {
     if (!it.image) return null;
-    if (it.image.local) return VIEW ? it.image.local : 'hangar://' + it.image.local;
+    if (it.image.local) return SNAP ? it.image.local : 'hangar://' + it.image.local;
     return it.image.url || it.image.thumb || null;
   }
   function imgTag(it, extra = '') {
@@ -58,6 +59,7 @@
     setTimeout(() => t.remove(), ms);
   }
   const ICON = {
+    eye: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
     search: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
     camera: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     grid: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>',
@@ -85,7 +87,7 @@
     let html = tabs.map(([h, l, on]) => `<a href="${h}" class="${on ? 'active' : ''}">${l}</a>`).join('');
     if (!VIEW) html += `<a href="#/add" class="add ${route === 'add' ? 'active' : ''}">+ Add kit</a>`;
     document.getElementById('tabs').innerHTML = html;
-    document.getElementById('mode-pill').textContent = VIEW
+    document.getElementById('mode-pill').textContent = VIEW && !SNAP ? 'VIEW MODE · PREVIEW' : VIEW
       ? 'VIEW ONLY · ' + (DB.exported ? new Date(DB.exported).toLocaleDateString('en-GB') : '')
       : (DB.settings.priceProvider === 'ebay' ? 'LIVE · eBay UK' : 'PRICES: DUMMY DATA');
   }
@@ -137,7 +139,7 @@
     if (!VIEW) sorts.push(list === 'wishlist' ? ['paid', 'Target price'] : ['paid', 'Price paid'], ['value', 'Current value'], ['rrp', 'RRP']);
     if (!VIEW && list === 'collection') sorts.push(['pl', 'Profit / loss £'], ['plpct', 'Profit / loss %']);
     return `<div class="toolbar">
-      <div class="search">${ICON.search}<input id="q" placeholder="Search ${list === 'wishlist' ? 'wishlist' : 'collection'} — name, series, grade…" value="${esc(state.q)}"></div>
+      <div class="search">${ICON.search}<input id="q" placeholder="Search ${list === 'wishlist' ? 'wishlist' : 'collection'} — name, series, grade…" value="${esc(state.q)}">${state.q ? '<button class="search-x" id="qx" type="button" title="Clear search" aria-label="Clear search">✕</button>' : ''}</div>
       <div class="chips">${chips}</div>
       <select id="sort">${sorts.map(([v, l]) => `<option value="${v}" ${state.sort === v ? 'selected' : ''}>Sort: ${l}</option>`).join('')}</select>
       <button class="icon-btn" id="dir" title="Reverse order">${state.dir > 0 ? '↑' : '↓'}</button>
@@ -160,7 +162,7 @@
       }
     }
     return `<a class="card" href="#/item/${it.id}" style="--card-accent:${accent}">
-      <div class="card-img${it.limited ? ' ltd' : ''}">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${it.limited ? '<span class="flag">LIMITED</span>' : '<span class="flag std">STANDARD</span>'}${plTag}</div>
+      <div class="card-img${it.limited ? ' ltd' : ''}">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${VIEW ? (it.limited ? '<span class="flag pill">LIMITED</span>' : '') : it.limited ? '<span class="flag">LIMITED</span>' : '<span class="flag std">STANDARD</span>'}${plTag}</div>
       <div class="card-body"><div class="card-title">${esc(it.title)}${it.qty > 1 ? ` <span class="model-no">×${it.qty}</span>` : ''}</div><div class="card-series">${esc(it.series || '')}</div>${money}</div>
     </a>`;
   }
@@ -206,6 +208,9 @@
   }
   function bindToolbar(list) {
     const q = document.getElementById('q');
+    const qx = document.getElementById('qx');
+    if (qx) qx.onclick = () => { state.q = ''; saveUI(); renderList(list); document.getElementById('q').focus(); };
+    q.onkeydown = (e) => { if (e.key === 'Escape' && q.value) { e.preventDefault(); qx && qx.click(); } };
     q.oninput = () => { state.q = q.value; saveUI(); const pos = q.selectionStart; renderList(list); const n = document.getElementById('q'); n.focus(); n.setSelectionRange(pos, pos); };
     $app.querySelectorAll('[data-grade]').forEach((b) => b.onclick = () => { state.grade = b.dataset.grade; saveUI(); renderList(list); });
     document.getElementById('sort').onchange = (e) => { state.sort = e.target.value; saveUI(); renderList(list); };
@@ -681,7 +686,7 @@
   }
 
   async function boot() {
-    if (VIEW) { DB = window.HANGAR_SNAPSHOT || { items: [] }; DB.settings = {}; }
+    if (SNAP) { DB = window.HANGAR_SNAPSHOT || { items: [] }; DB.settings = {}; }
     else {
       DB = await API.getDB();
       API.on('db-changed', async () => { DB = await API.getDB(); if (!document.querySelector('.modal-bg') && !document.getElementById('rf') && !document.getElementById('ef')) route(); });
@@ -689,6 +694,14 @@
     }
     DB.items = DB.items.filter((i) => i.list === 'collection' || i.list === 'wishlist');
     window.addEventListener('hashchange', route);
+    document.body.classList.toggle('view-mode', VIEW);
+    if (!SNAP) {
+      const vb = document.createElement('button');
+      vb.className = 'icon-btn view-btn'; vb.id = 'view-btn'; vb.innerHTML = ICON.eye;
+      const sync = () => { vb.classList.toggle('on', VIEW); vb.title = VIEW ? 'View mode on — click to turn off' : 'View mode: preview the page without prices or editing'; document.body.classList.toggle('view-mode', VIEW); };
+      vb.onclick = () => { VIEW = !VIEW; sync(); if (VIEW && /^#\/(add|settings)/.test(location.hash)) location.hash = '#/'; else route(); };
+      document.getElementById('theme-btn').before(vb); sync();
+    }
     // floating back-to-top button
     const top = document.createElement('button');
     top.className = 'to-top'; top.title = 'Back to top'; top.setAttribute('aria-label', 'Back to top'); top.textContent = '↑';
