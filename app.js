@@ -229,14 +229,13 @@
       ['Quantity', it.qty || 1],
       ['Added', esc(it.added || '—')],
     ];
-    if (it.notes) spec.push(['Notes', esc(it.notes)]);
-    if (!VIEW && it.original && it.original !== it.title) spec.push(['Your note', `<span class="model-no">${esc(it.original)}</span>`]);
+    if (it.notes) spec.push(['Notes', `<span class="model-no">${esc(it.notes)}</span>`]);
     if (!VIEW && it.list === 'wishlist' && it.whereToBuy) spec.push(['Where', esc(it.whereToBuy)]);
 
     let money = '';
     if (!VIEW) {
       const c = it.current || {};
-      const rrpLine = `<div><div class="k">RRP (Japan list price)</div><div class="v">${rrpText(it)}</div><div class="s">${rrpUnknown(it) ? esc((it.rrpSource || '').replace(/^\[unknown\]\s*–?\s*/, '')) : yen(it.rrpJpy) + (it.rrpSource ? ' · ' + esc(it.rrpSource) : '')}</div></div>`;
+      const rrpLine = `<div><div class="k">RRP (Japan list price)</div><div class="v">${rrpText(it)}</div><div class="s">${rrpUnknown(it) ? esc((it.rrpSource || '').replace(/^\[unknown\]\s*–?\s*/, '')) : yen(it.rrpJpy) + (it.rrpSource ? ' · ' + esc(it.rrpSource) : '')}${it.rrpUrl ? ' · <a href="#" id="rrpsrc">source</a>' : ''} · <a href="#" id="findrrp">Find RRP</a></div></div>`;
       const curLine = `<div><div class="k">Current value</div><div class="v">${gbp(value(it))}</div><div class="s">${esc(c.source || 'not priced')}${c.samples ? ' · ' + c.samples + ' listings' : ''}</div></div>`;
       if (it.list === 'wishlist') {
         money = `<div class="money"><div><div class="k">Target price</div><div class="v">${gbp(it.targetPrice)}</div><div class="s">from your list</div></div>${curLine}${rrpLine}</div>`;
@@ -253,9 +252,8 @@
         <button class="btn" id="relookup" title="Re-run the online lookup using the current title">Update from name</button>
         <button class="btn" id="reprice">Refresh price</button>
         ${it.list === 'wishlist' ? '<button class="btn red" id="gotit">Got it! Move to collection</button>' : ''}
-        <span class="spacer"></span>
-        <button class="btn ghost-danger" id="del">Delete</button>
-      </div>`;
+      </div>
+      <div class="danger-row"><span>Remove this entry from your ${it.list === 'wishlist' ? 'wishlist' : 'collection'}</span><button class="link-danger" id="del">Delete entry</button></div>`;
 
     $app.innerHTML = `<a class="back" href="${backHref}">${ICON.back} Back to ${it.list === 'wishlist' ? 'wishlist' : 'collection'}</a>
       <div class="item">
@@ -277,6 +275,8 @@
     document.getElementById('edit').onclick = () => editForm(it);
     document.getElementById('photo').onclick = () => photoPicker(it);
     document.getElementById('relookup').onclick = () => relookup(it);
+    const fr = document.getElementById('findrrp'); if (fr) fr.onclick = (e) => { e.preventDefault(); rrpPicker(it, async (c) => { await applyRrp(it, c); renderItem(it.id); }); };
+    const rs = document.getElementById('rrpsrc'); if (rs) rs.onclick = (e) => { e.preventDefault(); API.openUrl(it.rrpUrl); };
     document.getElementById('reprice').onclick = async () => { DB = await API.refreshPrices([it.id]); toast('Price refreshed'); renderItem(id); };
     document.getElementById('del').onclick = async () => { if (await API.deleteItem(it.id)) { DB = await API.getDB(); location.hash = backHref; } };
     const g = document.getElementById('gotit');
@@ -369,6 +369,76 @@
       const r = await API.setImageFromFile(it.id); if (r) { DB = await API.getDB(); close(); renderItem(it.id); }
     };
     paint();
+  }
+
+  // ---------- RRP lookup ----------
+  async function applyRrp(it, c) {
+    const o = { ...DB.items.find((x) => x.id === it.id) || it, rrpJpy: c.priceJpy, rrpSource: 'suggested (Bic Camera)', rrpUrl: c.url };
+    await API.saveItem(o); DB = await API.refreshPrices([o.id]); return o;
+  }
+  function candRow(c, i, best) {
+    return `<div class="rrp-cand${i === 0 && best ? ' best' : ''}"><div class="rrp-t">${esc(c.title)}<div class="model-no">${c.released ? 'Released ' + esc(c.released) + ' · ' : ''}match score ${c.score}</div></div>
+      <div class="rrp-p">${yen(c.priceJpy)}<div class="model-no">${gbp(c.priceJpy / rate())}</div></div>
+      <div class="rrp-b"><button class="btn" type="button" data-view="${i}">View</button><button class="btn primary" type="button" data-use="${i}">Use</button></div></div>`;
+  }
+  function rrpPicker(it, onUse) {
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal"><div class="modal-head"><h3>Find RRP</h3><button class="icon-btn" id="x">✕</button></div><div class="modal-body">
+      <div class="row"><input class="input" id="rq" style="flex:1" value="${esc(it.title)}"><button class="btn primary" id="rs">Search again</button></div>
+      <p class="hint" style="margin:10px 0">Official maker price (tax incl.) from Bic Camera. Check it's the same kit before using it.</p><div id="rl"></div></div></div>`;
+    document.body.appendChild(bg);
+    const close = () => bg.remove(); bg.querySelector('#x').onclick = close; bg.onclick = (e) => { if (e.target === bg) close(); };
+    const run = async (title) => {
+      const rl = bg.querySelector('#rl'); rl.innerHTML = '<div class="empty">Searching Bic Camera…</div>';
+      let r; try { r = await API.findRrp({ ...it, title }); } catch (e) { rl.innerHTML = '<div class="empty">Search failed — check your connection.</div>'; return; }
+      if (!document.body.contains(bg)) return;
+      if (!r.candidates.length) { rl.innerHTML = `<div class="empty">No priced match found for “${esc(r.query)}”. Try a simpler name, or the Japanese name.</div>`; return; }
+      rl.innerHTML = `<div class="model-no" style="margin-bottom:6px">Searched: ${esc(r.query)}</div>` + r.candidates.map((c, i) => candRow(c, i, true)).join('');
+      rl.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => API.openUrl(r.candidates[+b.dataset.view].url));
+      rl.querySelectorAll('[data-use]').forEach((b) => b.onclick = async () => { b.disabled = true; await onUse(r.candidates[+b.dataset.use]); close(); toast('RRP updated'); });
+    };
+    bg.querySelector('#rs').onclick = () => run(bg.querySelector('#rq').value.trim());
+    run(it.title);
+  }
+  function bulkRrp() {
+    const todo = DB.items.filter((i) => rrpUnknown(i) && !/never sold/.test(i.rrpSource || ''));
+    if (!todo.length) { toast('Every kit already has an RRP'); return; }
+    const bg = document.createElement('div'); bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal" style="width:min(1000px,100%)"><div class="modal-head"><h3>Find missing RRPs</h3><button class="icon-btn" id="x">✕</button></div><div class="modal-body">
+      <p class="hint" style="margin-top:0">Looking up ${todo.length} kits on Bic Camera, one at a time (about 10 seconds each). Strong matches are ticked; check each before applying.</p>
+      <div class="row" style="margin-bottom:12px"><span class="progress" id="bp">Starting…</span><span class="spacer" style="flex:1"></span><button class="btn" id="stop">Stop</button><button class="btn primary" id="apply" disabled>Apply ticked</button></div>
+      <table class="list" style="box-shadow:none"><thead><tr><th></th><th>Your kit</th><th>Best match on Bic Camera</th><th class="num">RRP</th><th></th></tr></thead><tbody id="bt"></tbody></table></div></div>`;
+    document.body.appendChild(bg);
+    let stopped = false; const found = {};
+    const close = () => { stopped = true; bg.remove(); if (location.hash.startsWith('#/settings')) renderSettings(); };
+    bg.querySelector('#x').onclick = close; bg.querySelector('#stop').onclick = (e) => { stopped = true; e.target.disabled = true; };
+    const tb = bg.querySelector('#bt');
+    tb.innerHTML = todo.map((it) => `<tr data-id="${it.id}"><td><input type="checkbox" disabled></td><td>${esc(it.title)}</td><td class="m model-no">waiting</td><td class="num p"></td><td class="v"></td></tr>`).join('');
+    (async () => {
+      let n = 0;
+      for (const it of todo) {
+        if (stopped) break;
+        const tr = tb.querySelector(`tr[data-id="${it.id}"]`); tr.querySelector('.m').textContent = 'searching…';
+        bg.querySelector('#bp').textContent = `Checking ${++n} of ${todo.length}`;
+        try {
+          const r = await API.findRrp(it); const c = r.candidates[0];
+          if (!document.body.contains(bg)) return;
+          if (c) {
+            found[it.id] = c; const cb = tr.querySelector('input'); cb.disabled = false; cb.checked = c.score >= 8;
+            tr.querySelector('.m').innerHTML = `<span style="font-family:var(--font);font-size:13px;color:var(--ink)">${esc(c.title)}</span><br>score ${c.score}`;
+            tr.querySelector('.p').textContent = yen(c.priceJpy);
+            tr.querySelector('.v').innerHTML = '<a href="#">view</a>'; tr.querySelector('.v a').onclick = (e) => { e.preventDefault(); API.openUrl(c.url); };
+          } else tr.querySelector('.m').textContent = 'no match';
+        } catch (e) { tr.querySelector('.m').textContent = 'search failed'; }
+        bg.querySelector('#apply').disabled = !Object.keys(found).length;
+      }
+      if (document.body.contains(bg)) bg.querySelector('#bp').textContent = stopped ? 'Stopped' : 'Done';
+    })();
+    bg.querySelector('#apply').onclick = async (e) => {
+      e.target.disabled = true; let k = 0;
+      for (const tr of tb.querySelectorAll('tr')) { const cb = tr.querySelector('input'); const c = found[tr.dataset.id]; if (cb.checked && c) { await applyRrp(DB.items.find((x) => x.id === tr.dataset.id), c); k++; } }
+      toast(`${k} RRP${k === 1 ? '' : 's'} applied`); close();
+    };
   }
 
   // ---------- update details from the (corrected) name ----------
@@ -476,14 +546,24 @@
       const rv = document.getElementById('review');
       const paintCands = () => `<div class="cands">${draft.imageCandidates.slice(0, 12).map((c, i) => `<button type="button" class="cand ${chosen === c ? 'sel' : ''}" data-i="${i}"><img src="${esc(c.th || c.u)}" data-fallback="${esc(c.u)}" referrerpolicy="no-referrer" alt=""><span>${esc(c.t)}</span></button>`).join('') || '<div class="empty">No photos found — you can add one after saving.</div>'}</div>`;
       rv.innerHTML = `<form id="rf"><div class="section-title">Check the details</div>${fieldsHTML(draft, list)}
+        <div class="note" id="rrpsug">Looking up RRP on Bic Camera…</div>
         <div class="note">RRP starts blank — enter the Japanese list price if you know it. Current value uses ${DB.settings.priceProvider === 'ebay' ? 'eBay UK listings' : 'dummy data until eBay access is approved'}.</div>
         <div class="section-title">Pick a photo</div><div id="cw">${paintCands()}</div>
         <div class="row" style="margin-top:18px"><button class="btn primary" type="submit">Save to ${list}</button></div></form>`;
+      let pickedRrp = null;
+      const showSug = (c) => { const el = document.getElementById('rrpsug'); if (!el) return;
+        if (!c) { el.innerHTML = 'No RRP found automatically. <a href="#" id="rrpmore">Search manually</a>'; }
+        else el.innerHTML = `Suggested RRP <b>${yen(c.priceJpy)}</b> from “${esc(c.title)}” <a href="#" id="rrpuse">Use</a> · <a href="#" id="rrpmore">Other matches</a>`;
+        const u = document.getElementById('rrpuse'); if (u) u.onclick = (e) => { e.preventDefault(); setR(c); };
+        document.getElementById('rrpmore').onclick = (e) => { e.preventDefault(); rrpPicker({ ...draft, title: document.querySelector('#rf [name=title]').value }, async (cc) => setR(cc)); }; };
+      const setR = (c) => { pickedRrp = c; document.querySelector('#rf [name=rrpJpy]').value = c.priceJpy; document.getElementById('rrpsug').innerHTML = `RRP set to <b>${yen(c.priceJpy)}</b> from Bic Camera.`; };
+      API.findRrp(draft).then((r) => showSug(r.candidates[0] && r.candidates[0].score >= 4 ? r.candidates[0] : null)).catch(() => showSug(null));
       const bindC = () => document.querySelectorAll('#cw .cand').forEach((b) => b.onclick = () => { chosen = draft.imageCandidates[+b.dataset.i]; document.getElementById('cw').innerHTML = paintCands(); bindC(); });
       bindC();
       document.getElementById('rf').onsubmit = async (ev) => {
         ev.preventDefault();
         const o = readFields(ev.target, draft);
+        if (pickedRrp && o.rrpJpy === pickedRrp.priceJpy && o.rrpSource !== 'verified') { o.rrpSource = 'suggested (Bic Camera)'; o.rrpUrl = pickedRrp.url; }
         await API.saveItem(o);
         if (chosen) await API.setImage(o.id, chosen);
         DB = await API.refreshPrices([o.id]);
@@ -526,6 +606,9 @@
         <div class="row"><button class="btn" id="ci">Download any missing photos</button></div>
         <p class="hint" style="margin-top:12px">Photos to check (missing, or auto-matched with low confidence): <a href="#/" id="chk-c">${DB.items.filter((i) => i.list === 'collection' && needsCheck(i)).length} in collection</a> · <a href="#/wishlist" id="chk-w">${DB.items.filter((i) => i.list === 'wishlist' && needsCheck(i)).length} in wishlist</a>. Picking a new photo clears the flag.</p>
       </div>
+      <div class="panel"><h2>RRP lookup</h2><p class="hint">Finds official maker prices (tax incl.) on Bic Camera for kits with no RRP. Works best for standard kits; event exclusives and gashapon usually aren't listed.</p>
+        <div class="row"><button class="btn primary" id="bulkrrp">Find missing RRPs</button><span class="model-no">${DB.items.filter((i) => rrpUnknown(i)).length} without an RRP</span></div>
+      </div>
       <div class="panel"><h2>Data</h2><p class="hint">Everything lives in one JSON file plus an images folder. A backup of the previous version is kept on every save.</p>
         <div class="row"><button class="btn" id="od">Open data folder</button></div>
         <p class="hint" style="margin-top:12px"><span class="model-no">${esc(paths.data)}</span></p>
@@ -558,6 +641,7 @@
     document.getElementById('exo').onclick = () => API.openPath(paths.view);
     document.getElementById('od').onclick = () => API.openPath(paths.data);
     ['chk-c', 'chk-w'].forEach((id) => document.getElementById(id).onclick = () => { state.review = true; state.grade = 'All'; state.q = ''; saveUI(); });
+    document.getElementById('bulkrrp').onclick = () => bulkRrp();
     document.getElementById('ci').onclick = () => { API.cacheImages(); toast('Downloading photos in the background'); };
   }
 
