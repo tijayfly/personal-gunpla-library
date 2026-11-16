@@ -690,7 +690,14 @@
     }
     DB.items = DB.items.filter((i) => i.list === 'collection' || i.list === 'wishlist');
     window.addEventListener('hashchange', route);
-    route();
+    // floating back-to-top button
+    const top = document.createElement('button');
+    top.className = 'to-top'; top.title = 'Back to top'; top.setAttribute('aria-label', 'Back to top'); top.textContent = '↑';
+    top.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.body.appendChild(top);
+    const onScroll = () => top.classList.toggle('show', window.scrollY > 600);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    route(); onScroll();
   }
   boot();
 })();

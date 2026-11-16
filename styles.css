@@ -291,3 +291,7 @@ table.list td.num { white-space: nowrap; }
 .toolbar select, .toolbar #dir, .toolbar #review { height: 38px; box-sizing: border-box; }
 .toolbar #dir { width: 38px; }
 .toolbar .seg button { height: 36px; box-sizing: border-box; }
+.to-top { position: fixed; right: 22px; bottom: 22px; z-index: 50; width: 46px; height: 46px; border: 0; background: var(--blue); color: #fff; font-size: 20px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow); clip-path: polygon(0 0, 100% 0, 100% 78%, 78% 100%, 0 100%); opacity: 0; transform: translateY(10px); pointer-events: none; transition: opacity .2s, transform .2s, background .15s; }
+.to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+.to-top:hover { background: var(--red); }
+@media (max-width: 640px) { .to-top { right: 14px; bottom: 14px; width: 42px; height: 42px; } }
