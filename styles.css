@@ -199,3 +199,68 @@ table.list td:first-child .noimg { width: 52px; height: 40px; padding: 0; font-s
 table.list td:first-child .noimg svg { width: 16px; height: 16px; margin: 0; }
 table.list td.num { white-space: nowrap; }
 .cands .empty { grid-column: 1 / -1; padding: 24px; }
+
+/* ---------- phone layout (iPhone etc.) ---------- */
+@media (max-width: 640px) {
+  .topbar-inner { flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px 8px; }
+  .brand img { width: 32px; height: 32px; }
+  .brand-name { font-size: 21px; }
+  .brand-sub, .mode-pill, .progress { display: none; }
+  .spacer { display: none; }
+  #theme-btn { margin-left: auto; width: 34px; height: 34px; }
+  nav.tabs { order: 3; width: 100%; margin: 0; overflow-x: auto; scrollbar-width: none; }
+  nav.tabs::-webkit-scrollbar { display: none; }
+  nav.tabs a { flex: 0 0 auto; font-size: 14px; padding: 8px 12px; }
+  main { padding: 12px 12px 40px; }
+
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .stat:nth-child(even) { border-right: 0; }
+  .stat-value { font-size: 21px; }
+  .stats .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  .toolbar { gap: 8px; }
+  .search { flex: 1 1 100%; max-width: none; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; width: 100%; padding-bottom: 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; }
+  .toolbar select { flex: 1; min-width: 0; }
+  .result-count { width: 100%; text-align: right; margin-left: 0; }
+
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .card-body { padding: 9px 10px 10px 12px; }
+  .card-title { font-size: 13px; }
+  .card-series { font-size: 11px; }
+  .card-img .grade { top: 6px; left: 8px; transform: scale(.9); transform-origin: left top; }
+  .card-img .scale { top: 6px; right: 6px; font-size: 10px; }
+  .card-img .flag { bottom: 6px; left: 8px; font-size: 9px; }
+  .card-money { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .card-money .now { font-size: 15px; }
+
+  table.list { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.list th, table.list td { padding: 7px 8px; font-size: 12.5px; }
+
+  .item { gap: 12px; }
+  .boxart { padding: 10px; }
+  .boxart .callout { right: 16px; bottom: 16px; }
+  .spec-head { padding: 14px 14px 12px; }
+  .spec-head h1 { font-size: 20px; max-width: 78%; }
+  .spec-head::after { width: 80px; }
+  .spec-rows { grid-template-columns: 96px 1fr; }
+  .spec-rows > div { padding: 9px 12px; }
+  .money { padding: 12px 14px; gap: 10px 12px; }
+  .money .v { font-size: 19px; }
+  .actions { padding: 12px 14px; }
+  .actions .btn { flex: 1 1 calc(50% - 8px); justify-content: center; }
+  .actions .spacer { display: none; }
+
+  .panel { padding: 16px 14px; }
+  .form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .form .span-6, .form .span-4, .form .span-3, .form .span-2 { grid-column: 1 / -1; }
+  .form .span-1 { grid-column: span 1; }
+  .cands { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+  .modal-bg { padding: 0; align-items: end; }
+  .modal { width: 100% !important; max-height: 92vh; }
+  .foot { font-size: 10.5px; }
+}
