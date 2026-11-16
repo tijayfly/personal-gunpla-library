@@ -25,6 +25,8 @@
   const pct = (n) => n == null || !isFinite(n) ? '' : (n > 0 ? '+' : '') + n.toFixed(0) + '%';
   const rate = () => (DB.settings && DB.settings.jpyPerGbp) || 200;
   const rrpGbp = (it) => it.rrpJpy ? it.rrpJpy / rate() : null;
+  const rrpUnknown = (it) => !it.rrpJpy;
+  const rrpText = (it) => rrpUnknown(it) ? '—' : gbp(rrpGbp(it));
   const cost = (it) => it.gift ? 0 : (it.paid || 0);
   const value = (it) => it.current && it.current.gbp != null ? it.current.gbp : null;
   const pl = (it) => value(it) == null ? null : value(it) - cost(it);
@@ -92,7 +94,7 @@
     let items = DB.items.filter((i) => i.list === list);
     const counts = { All: items.length };
     for (const i of items) counts[i.grade] = (counts[i.grade] || 0) + 1;
-    if (q) items = items.filter((i) => [i.title, i.series, i.grade, gradeName(i.grade), i.notes, i.scale].join(' ').toLowerCase().includes(q));
+    if (q) items = items.filter((i) => [i.title, i.series, i.grade, gradeName(i.grade), i.notes, i.scale, rrpUnknown(i) ? 'unknown rrp' : ''].join(' ').toLowerCase().includes(q));
     if (state.grade !== 'All') items = items.filter((i) => i.grade === state.grade);
     if (state.review && !VIEW) items = items.filter(needsCheck);
     const key = {
@@ -124,7 +126,7 @@
       <div class="stat"><div class="stat-label">Total paid</div><div class="stat-value">${gbp(paid)}</div><div class="stat-sub">gifts counted as £0</div></div>
       <div class="stat"><div class="stat-label">Current value</div><div class="stat-value">${gbp(val)}</div><div class="stat-sub">${valued.length}/${items.length} priced</div></div>
       <div class="stat"><div class="stat-label">Profit / loss</div><div class="stat-value ${cls(gain)}">${signed(gain)}</div><div class="stat-sub ${cls(gain)}">${paid ? pct((gain / paid) * 100) + ' on cost' : ''}</div></div>
-      <div class="stat"><div class="stat-label">Total RRP</div><div class="stat-value">${gbp(rrp)}</div><div class="stat-sub">${yen(items.reduce((s, i) => s + (i.rrpJpy || 0), 0))} @ ¥${Math.round(rate())}/£</div></div>
+      <div class="stat"><div class="stat-label">Total RRP</div><div class="stat-value">${gbp(rrp)}</div><div class="stat-sub">${yen(items.reduce((s, i) => s + (i.rrpJpy || 0), 0))} @ ¥${Math.round(rate())}/£${items.filter(rrpUnknown).length ? ' · ' + items.filter(rrpUnknown).length + ' unknown' : ''}</div></div>
     </section>`;
   }
 
@@ -174,8 +176,8 @@
       let tds = `<td>${src ? `<img class="thumb" src="${esc(src)}" ${it.image && it.image.thumb && !it.image.local ? `data-fallback="${esc(it.image.thumb)}"` : ''} referrerpolicy="no-referrer" loading="lazy" alt="">` : ''}</td>
         <td><span class="grade g-${it.grade}">${it.grade}</span></td><td>${esc(it.title)}${it.qty > 1 ? ' ×' + it.qty : ''}${it.limited ? ' <span class="model-no">LTD</span>' : ''}</td><td class="model-no">${esc(it.scale || '')}</td><td>${esc(it.series || '')}</td>`;
       if (!VIEW) {
-        if (list === 'wishlist') tds += `<td class="num">${gbp(it.targetPrice)}</td><td class="num">${gbp(rrpGbp(it))}</td><td class="num">${gbp(value(it))}</td>`;
-        else tds += `<td class="num">${it.gift ? 'Gift' : gbp(cost(it))}</td><td class="num">${gbp(rrpGbp(it))}</td><td class="num">${gbp(value(it))}</td><td class="num ${cls(pl(it))}">${signed(pl(it))}</td><td class="num ${cls(pl(it))}">${pct(plPct(it))}</td>`;
+        if (list === 'wishlist') tds += `<td class="num">${gbp(it.targetPrice)}</td><td class="num">${rrpText(it)}</td><td class="num">${gbp(value(it))}</td>`;
+        else tds += `<td class="num">${it.gift ? 'Gift' : gbp(cost(it))}</td><td class="num">${rrpText(it)}</td><td class="num">${gbp(value(it))}</td><td class="num ${cls(pl(it))}">${signed(pl(it))}</td><td class="num ${cls(pl(it))}">${pct(plPct(it))}</td>`;
       }
       return `<tr data-id="${it.id}">${tds}</tr>`;
     }).join('');
@@ -234,14 +236,14 @@
     let money = '';
     if (!VIEW) {
       const c = it.current || {};
-      const rrpLine = `<div><div class="k">RRP (Japan list price)</div><div class="v">${it.rrpJpy ? gbp(rrpGbp(it)) : '—'}</div><div class="s">${yen(it.rrpJpy)}${it.rrpSource ? ' · ' + esc(it.rrpSource) : ''}</div></div>`;
+      const rrpLine = `<div><div class="k">RRP (Japan list price)</div><div class="v">${rrpText(it)}</div><div class="s">${rrpUnknown(it) ? esc((it.rrpSource || '').replace(/^\[unknown\]\s*–?\s*/, '')) : yen(it.rrpJpy) + (it.rrpSource ? ' · ' + esc(it.rrpSource) : '')}</div></div>`;
       const curLine = `<div><div class="k">Current value</div><div class="v">${gbp(value(it))}</div><div class="s">${esc(c.source || 'not priced')}${c.samples ? ' · ' + c.samples + ' listings' : ''}</div></div>`;
       if (it.list === 'wishlist') {
         money = `<div class="money"><div><div class="k">Target price</div><div class="v">${gbp(it.targetPrice)}</div><div class="s">from your list</div></div>${curLine}${rrpLine}</div>`;
       } else {
         const p = pl(it);
         money = `<div class="money"><div><div class="k">Price paid</div><div class="v">${it.gift ? 'Gift' : gbp(cost(it), 2)}</div><div class="s">${it.gift ? 'counted as £0' : ''}</div></div>${curLine}${rrpLine}
-          <div><div class="k">vs RRP</div><div class="v ${cls(it.rrpJpy ? rrpGbp(it) - cost(it) : null)}" style="font-size:18px">${it.rrpJpy && !it.gift ? (cost(it) > rrpGbp(it) ? 'Paid ' + gbp(cost(it) - rrpGbp(it)) + ' over' : 'Paid ' + gbp(rrpGbp(it) - cost(it)) + ' under') : '—'}</div></div>
+          <div><div class="k">vs RRP</div><div class="v ${cls(it.rrpJpy ? rrpGbp(it) - cost(it) : null)}" style="font-size:18px">${rrpUnknown(it) ? '—' : it.rrpJpy && !it.gift ? (cost(it) > rrpGbp(it) ? 'Paid ' + gbp(cost(it) - rrpGbp(it)) + ' over' : 'Paid ' + gbp(rrpGbp(it) - cost(it)) + ' under') : '—'}</div></div>
           <div class="pl"><span class="k">Profit / loss</span><span class="v ${cls(p)}">${signed(p)} <span style="font-size:14px">${pct(plPct(it))}</span></span></div></div>`;
       }
     }
@@ -294,7 +296,7 @@
            <label class="span-2">Where to buy<input class="input" name="whereToBuy" value="${esc(d.whereToBuy || '')}"></label>`
         : `<label class="span-2">Price paid (£)<input class="input" name="paid" type="number" step="0.01" value="${d.gift ? '' : (d.paid ?? '')}"></label>
            <label class="span-2 check"><input type="checkbox" name="gift" ${d.gift ? 'checked' : ''}> Gift (counts as £0)</label>`}
-      <label class="span-2">RRP (¥, Japan list price)<input class="input" name="rrpJpy" type="number" step="1" value="${d.rrpJpy ?? ''}"></label>
+      <label class="span-2">RRP (¥, Japan list price)<input class="input" name="rrpJpy" type="number" step="1" value="${d.rrpJpy ?? ''}" placeholder="—"></label>
       <label class="span-2 check"><input type="checkbox" name="limited" ${d.limited ? 'checked' : ''}> Limited / exclusive</label>
       <label class="span-2 check"><input type="checkbox" name="rrpVerified" ${d.rrpSource === 'verified' ? 'checked' : ''}> RRP checked by me</label>
       <label class="span-2">Date added<input class="input" name="added" type="date" value="${esc(d.added || new Date().toISOString().slice(0, 10))}"></label>
@@ -307,7 +309,9 @@
     o.qty = Math.max(1, parseInt(f.get('qty') || '1', 10)); o.notes = (f.get('notes') || '').trim(); o.added = f.get('added');
     o.limited = !!f.get('limited');
     const r = f.get('rrpJpy'); o.rrpJpy = r === '' ? null : Number(r);
-    if (f.get('rrpVerified')) o.rrpSource = 'verified'; else if (o.rrpSource === 'verified') o.rrpSource = 'approx';
+    if (o.rrpJpy == null) o.rrpSource = '[unknown]';
+    else if (f.get('rrpVerified')) o.rrpSource = 'verified';
+    else if (o.rrpSource === 'verified' || /^\[unknown\]/.test(o.rrpSource || '')) o.rrpSource = 'entered manually';
     if (o.list === 'wishlist') { const t = f.get('targetPrice'); o.targetPrice = t === '' ? null : Number(t); o.whereToBuy = (f.get('whereToBuy') || '').trim(); }
     else { o.gift = !!f.get('gift'); const p = f.get('paid'); o.paid = o.gift || p === '' ? null : Number(p); }
     return o;
@@ -380,7 +384,7 @@
     if (!document.body.contains(bg)) return;
     const fmt = { rrpJpy: yen, limited: (v) => v ? 'Limited' : 'Standard' };
     const rows = [['grade', 'Grade'], ['scale', 'Scale'], ['series', 'Series'], ['limited', 'Edition'], ['rrpJpy', 'RRP']]
-      .filter(([k]) => auto[k] !== undefined && auto[k] !== '' && auto[k] !== it[k])
+      .filter(([k]) => auto[k] !== undefined && auto[k] !== null && auto[k] !== '' && auto[k] !== it[k])
       .map(([k, l]) => {
         // RRP from a lookup is only a grade default: don't pre-tick it if the current one is verified or the grade is unchanged
         const on = k === 'rrpJpy' ? (it.rrpSource !== 'verified' && auto.grade !== it.grade) : true;
@@ -472,7 +476,7 @@
       const rv = document.getElementById('review');
       const paintCands = () => `<div class="cands">${draft.imageCandidates.slice(0, 12).map((c, i) => `<button type="button" class="cand ${chosen === c ? 'sel' : ''}" data-i="${i}"><img src="${esc(c.th || c.u)}" data-fallback="${esc(c.u)}" referrerpolicy="no-referrer" alt=""><span>${esc(c.t)}</span></button>`).join('') || '<div class="empty">No photos found — you can add one after saving.</div>'}</div>`;
       rv.innerHTML = `<form id="rf"><div class="section-title">Check the details</div>${fieldsHTML(draft, list)}
-        <div class="note">RRP is a typical Japanese list price for this grade — adjust it if you know the exact figure. Current value uses ${DB.settings.priceProvider === 'ebay' ? 'eBay UK listings' : 'dummy data until eBay access is approved'}.</div>
+        <div class="note">RRP starts blank — enter the Japanese list price if you know it. Current value uses ${DB.settings.priceProvider === 'ebay' ? 'eBay UK listings' : 'dummy data until eBay access is approved'}.</div>
         <div class="section-title">Pick a photo</div><div id="cw">${paintCands()}</div>
         <div class="row" style="margin-top:18px"><button class="btn primary" type="submit">Save to ${list}</button></div></form>`;
       const bindC = () => document.querySelectorAll('#cw .cand').forEach((b) => b.onclick = () => { chosen = draft.imageCandidates[+b.dataset.i]; document.getElementById('cw').innerHTML = paintCands(); bindC(); });
@@ -504,10 +508,20 @@
         <p class="hint" style="margin-top:10px">${s.fxUpdated ? 'Rate updated ' + esc(s.fxUpdated) : 'Rate not yet updated online'} · keys are stored only in your local data file.</p>
         <div class="row"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="rp">Refresh all prices</button></div>
       </form>
-      <div class="panel"><h2>View-only page</h2><p class="hint">Exports a static web page of your collection with <b>all price data removed</b> (paid, RRP, current values, P&amp;L, wishlist targets).</p>
-        <div class="row"><button class="btn red" id="ex">Export view-only snapshot</button><button class="btn" id="exo">Open folder</button></div>
-        <p class="hint" style="margin-top:12px">Saved to: <span class="model-no">${esc(paths.view)}</span><br>Open <span class="model-no">index.html</span> in any browser.</p>
-      </div>
+      <form class="panel" id="gf2"><h2>View-only page</h2><p class="hint">Exports a static web page of your collection with <b>all price data removed</b> (paid, RRP, current values, P&amp;L, wishlist targets).</p>
+        <div class="row"><button class="btn red" type="button" id="ex">${s.githubPublish ? 'Export &amp; publish' : 'Export view-only snapshot'}</button><button class="btn" type="button" id="exo">Open folder</button></div>
+        <p class="hint" style="margin-top:12px">Saved to: <span class="model-no">${esc(paths.view)}</span></p>
+        <div class="section-title">Publish to GitHub</div>
+        <div class="form">
+          <label class="span-6 check"><input type="checkbox" name="githubPublish" ${s.githubPublish ? 'checked' : ''}> Also publish to GitHub every time I export</label>
+          <label class="span-4">Repository (owner/name)<input class="input" name="githubRepo" value="${esc(s.githubRepo || 'tijayfly/personal-gunpla-library')}"></label>
+          <label class="span-2">Branch<input class="input" name="githubBranch" value="${esc(s.githubBranch || '')}" placeholder="default"></label>
+          <label class="span-6">Access token<input class="input" name="githubToken" type="password" value="${esc(s.githubToken || '')}" autocomplete="off" placeholder="github_pat_…"></label>
+        </div>
+        <p class="hint" style="margin-top:10px">Use a fine-grained token limited to this one repo with <b>Contents: Read and write</b>. It's stored only in your local data file. Only HANGAR's own files are changed in the repo; anything else (README etc.) is left alone.</p>
+        <div class="row"><button class="btn primary" type="submit">Save GitHub settings</button><button class="btn" type="button" id="pub">Publish now</button>${s.githubRepo ? `<button class="btn" type="button" id="ghopen">Open repo</button>` : ''}</div>
+        <p class="hint" id="ghstatus" style="margin-top:12px">${s.githubLast ? 'Last published ' + esc(new Date(s.githubLast.at).toLocaleString('en-GB')) + (s.githubLast.changed ? ` · ${s.githubLast.uploaded} file(s) updated${s.githubLast.removed ? ', ' + s.githubLast.removed + ' removed' : ''}` : ' · no changes') : 'Not published yet.'}</p>
+      </form>
       <div class="panel"><h2>Photos</h2><p class="hint">Photos are downloaded once and kept with your data so they work offline.</p>
         <div class="row"><button class="btn" id="ci">Download any missing photos</button></div>
         <p class="hint" style="margin-top:12px">Photos to check (missing, or auto-matched with low confidence): <a href="#/" id="chk-c">${DB.items.filter((i) => i.list === 'collection' && needsCheck(i)).length} in collection</a> · <a href="#/wishlist" id="chk-w">${DB.items.filter((i) => i.list === 'wishlist' && needsCheck(i)).length} in wishlist</a>. Picking a new photo clears the flag.</p>
@@ -525,7 +539,22 @@
     };
     document.getElementById('fx').onclick = async () => { DB.settings = await API.refreshFx(); toast('Rate: ¥' + DB.settings.jpyPerGbp + ' per £'); renderSettings(); };
     document.getElementById('rp').onclick = async (e) => { e.target.disabled = true; e.target.textContent = 'Refreshing…'; DB = await API.refreshPrices(); toast('Prices refreshed'); renderSettings(); };
-    document.getElementById('ex').onclick = async () => { const r = await API.exportViewOnly(); toast(`Exported ${r.count} entries`); };
+    const doExport = async (publish) => {
+      const st = document.getElementById('ghstatus'); st.textContent = publish ? 'Exporting and publishing to GitHub…' : 'Exporting…';
+      const r = await API.exportViewOnly(publish === undefined ? undefined : { publish });
+      DB = await API.getDB();
+      if (r.publishError) { st.innerHTML = '<b style="color:var(--loss)">Publish failed:</b> ' + esc(r.publishError); toast('Exported, but publishing failed'); return; }
+      if (r.github) { st.textContent = r.github.changed ? `Published: ${r.github.uploaded} file(s) updated${r.github.removed ? ', ' + r.github.removed + ' removed' : ''}.` : 'Published: GitHub was already up to date.'; toast('Exported & published'); }
+      else { st.textContent = `Exported ${r.count} entries.`; toast(`Exported ${r.count} entries`); }
+    };
+    document.getElementById('ex').onclick = () => doExport();
+    document.getElementById('pub').onclick = () => doExport(true);
+    const gho = document.getElementById('ghopen'); if (gho) gho.onclick = () => API.openUrl('https://github.com/' + DB.settings.githubRepo);
+    document.getElementById('gf2').onsubmit = async (e) => {
+      e.preventDefault(); const f = new FormData(e.target);
+      DB.settings = await API.saveSettings({ githubPublish: !!f.get('githubPublish'), githubRepo: f.get('githubRepo').trim(), githubBranch: f.get('githubBranch').trim(), githubToken: f.get('githubToken').trim() });
+      toast('GitHub settings saved'); renderSettings();
+    };
     document.getElementById('exo').onclick = () => API.openPath(paths.view);
     document.getElementById('od').onclick = () => API.openPath(paths.data);
     ['chk-c', 'chk-w'].forEach((id) => document.getElementById(id).onclick = () => { state.review = true; state.grade = 'All'; state.q = ''; saveUI(); });
@@ -549,7 +578,7 @@
     else {
       DB = await API.getDB();
       API.on('db-changed', async () => { DB = await API.getDB(); if (!document.querySelector('.modal-bg') && !document.getElementById('rf') && !document.getElementById('ef')) route(); });
-      API.on('progress', (p) => { const el = document.getElementById('progress'); el.textContent = p.done < p.total ? `Downloading photos ${p.done}/${p.total}` : ''; });
+      API.on('progress', (p) => { const el = document.getElementById('progress'); el.textContent = p.done < p.total ? (p.kind === 'github' ? `Uploading to GitHub ${p.done}/${p.total}` : `Downloading photos ${p.done}/${p.total}`) : ''; });
     }
     DB.items = DB.items.filter((i) => i.list === 'collection' || i.list === 'wishlist');
     window.addEventListener('hashchange', route);
