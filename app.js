@@ -242,7 +242,7 @@
       } else {
         const p = pl(it);
         money = `<div class="money"><div><div class="k">Price paid</div><div class="v">${it.gift ? 'Gift' : gbp(cost(it), 2)}</div><div class="s">${it.gift ? 'counted as £0' : ''}</div></div>${curLine}${rrpLine}
-          <div><div class="k">vs RRP</div><div class="v ${cls(it.rrpJpy ? rrpGbp(it) - cost(it) : null)}" style="font-size:18px">${rrpUnknown(it) ? '—' : it.rrpJpy && !it.gift ? (cost(it) > rrpGbp(it) ? 'Paid ' + gbp(cost(it) - rrpGbp(it)) + ' over' : 'Paid ' + gbp(rrpGbp(it) - cost(it)) + ' under') : '—'}</div></div>
+          <div><div class="k">vs RRP</div><div class="v ${cls(it.rrpJpy && Math.abs(rrpGbp(it) - cost(it)) >= 0.5 ? rrpGbp(it) - cost(it) : null)}" style="font-size:18px">${rrpUnknown(it) ? '—' : it.rrpJpy && !it.gift ? (Math.abs(cost(it) - rrpGbp(it)) < 0.5 ? 'Paid RRP' : cost(it) > rrpGbp(it) ? 'Paid ' + gbp(cost(it) - rrpGbp(it)) + ' over' : 'Paid ' + gbp(rrpGbp(it) - cost(it)) + ' under') : '—'}</div></div>
           <div class="pl"><span class="k">Profit / loss</span><span class="v ${cls(p)}">${signed(p)} <span style="font-size:14px">${pct(plPct(it))}</span></span></div></div>`;
       }
     }
@@ -374,11 +374,11 @@
 
   // ---------- RRP lookup ----------
   const rrpProvisional = (i) => !rrpUnknown(i) && i.rrpSource !== 'verified' && /check|suggested|may differ|grade default/i.test(i.rrpSource || '');
-  function rrpIntro(limited, go) {
+  function rrpIntro(limited, go, title = 'Update RRP', lead = '', yes = 'Continue', no = 'Cancel') {
     const bg = document.createElement('div'); bg.className = 'modal-bg';
-    bg.innerHTML = `<div class="modal" style="width:min(480px,100%)"><div class="modal-head"><h3>Update RRP</h3><button class="icon-btn" id="x">✕</button></div><div class="modal-body">
-      <p style="margin-top:0">${limited ? 'This kit is marked as limited / exclusive, so it probably isn’t listed. ' : ''}RRPs come from Bic Camera, which only lists standard retail kits. Limited editions, event and Gundam Base exclusives, Premium Bandai, gashapon and other non-retail items may not return a price.</p>
-      <div class="row" style="margin-top:16px"><button class="btn primary" id="go">Continue</button><button class="btn" id="no">Cancel</button></div></div></div>`;
+    bg.innerHTML = `<div class="modal" style="width:min(480px,100%)"><div class="modal-head"><h3>${title}</h3><button class="icon-btn" id="x">✕</button></div><div class="modal-body">
+      <p style="margin-top:0">${lead}${limited ? 'This kit is marked as limited / exclusive, so it probably isn’t listed. ' : ''}RRPs come from Bic Camera, which only lists standard retail kits. Limited editions, event and Gundam Base exclusives, Premium Bandai, gashapon and other non-retail items may not return a price.</p>
+      <div class="row" style="margin-top:16px"><button class="btn primary" id="go">${yes}</button><button class="btn" id="no">${no}</button></div></div></div>`;
     document.body.appendChild(bg);
     const close = () => bg.remove();
     bg.querySelector('#x').onclick = close; bg.querySelector('#no').onclick = close; bg.onclick = (e) => { if (e.target === bg) close(); };
@@ -457,35 +457,29 @@
   async function relookup(it, afterRename) {
     const bg = document.createElement('div'); bg.className = 'modal-bg';
     bg.innerHTML = `<div class="modal"><div class="modal-head"><h3>Update from name</h3><button class="icon-btn" id="x">✕</button></div>
-      <div class="modal-body"><p style="margin-top:0">${afterRename ? 'You changed the title. ' : ''}Looking up <b>${esc(it.title)}</b> and its RRP…</p><p class="hint">The RRP search can take 10–20 seconds.</p></div></div>`;
+      <div class="modal-body"><p style="margin-top:0">${afterRename ? 'You changed the title. ' : ''}Looking up <b>${esc(it.title)}</b>…</p></div></div>`;
     document.body.appendChild(bg);
     const close = () => bg.remove();
     bg.querySelector('#x').onclick = close;
     let auto;
-    const [a1, a2] = await Promise.allSettled([API.autofill(it.title), API.findRrp(it)]);
-    auto = a1.status === 'fulfilled' ? a1.value : { ...M.parseName(it.title), imageCandidates: [] };
-    const rc = a2.status === 'fulfilled' ? (a2.value.candidates || [])[0] : null;
-    const rrpHit = rc && rc.score >= 4 ? rc : null;
-    auto.rrpJpy = rrpHit ? rrpHit.priceJpy : null;
-    const rrpNote = rrpHit ? '' : (a2.status === 'fulfilled' ? 'RRP: no match on Bic Camera, so the current RRP stays.' : 'RRP: couldn’t reach Bic Camera, so the current RRP stays.');
+    try { auto = await API.autofill(it.title); } catch (e) { auto = { ...M.parseName(it.title), imageCandidates: [] }; }
+    auto.rrpJpy = null; // RRP is offered separately after applying
     if (!document.body.contains(bg)) return;
     const fmt = { rrpJpy: yen, limited: (v) => v ? 'Limited' : 'Standard' };
     const rows = [['grade', 'Grade'], ['scale', 'Scale'], ['series', 'Series'], ['limited', 'Edition'], ['rrpJpy', 'RRP']]
       .filter(([k]) => auto[k] !== undefined && auto[k] !== null && auto[k] !== '' && auto[k] !== it[k])
       .map(([k, l]) => {
         // RRP from a lookup is only a grade default: don't pre-tick it if the current one is verified or the grade is unchanged
-        const on = k === 'rrpJpy' ? (rrpUnknown(it) || (it.rrpSource !== 'verified' && rrpHit.score >= 8)) : true;
+        const on = true;
         const f = fmt[k] || ((v) => esc(v || '—'));
-        const extra = k === 'rrpJpy' ? `<div class="model-no">Bic Camera: ${esc(rrpHit.title)} · <a href="#" id="rrpview">view</a></div>` : '';
-        return `<tr><td><label class="check" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}> ${l}</label></td><td>${k === 'rrpJpy' ? rrpText(it) : f(it[k])}</td><td><b>${f(auto[k])}</b>${extra}</td></tr>`;
+        return `<tr><td><label class="check" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}> ${l}</label></td><td>${f(it[k])}</td><td><b>${f(auto[k])}</b></td></tr>`;
       }).join('');
     const cands = auto.imageCandidates || [];
     let chosen = cands[0] || null;
     const paint = () => cands.slice(0, 12).map((c, i) => `<button type="button" class="cand ${chosen === c ? 'sel' : ''}" data-i="${i}"><img src="${esc(c.th || c.u)}" data-fallback="${esc(c.u)}" referrerpolicy="no-referrer" alt=""><span>${esc(c.t)}</span></button>`).join('');
     bg.querySelector('.modal-body').innerHTML = `
       <p style="margin-top:0">New details found for <b>${esc(it.title)}</b>. Tick what to apply — the title and price paid stay as you set them.</p>
-      ${rows ? `<table class="list" style="box-shadow:none"><thead><tr><th>Field</th><th>Current</th><th>Suggested</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="hint">Grade, scale, series and RRP already match.</p>'}
-      ${rrpNote ? `<p class="hint">${rrpNote}</p>` : ''}
+      ${rows ? `<table class="list" style="box-shadow:none"><thead><tr><th>Field</th><th>Current</th><th>Suggested</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="hint">Grade, scale and series already match.</p>'}
       <div class="section-title">Photo</div>
       <div class="row" style="margin-bottom:10px"><label class="check" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="keep"> Keep current photo</label></div>
       <div class="cands" id="rc">${cands.length ? paint() : '<div class="empty">No photos found online — keeping the current one.</div>'}</div>
@@ -493,18 +487,19 @@
       <div class="row" style="margin-top:16px"><button class="btn primary" id="apply">Apply</button><button class="btn" id="cancel">Cancel</button></div>`;
     const bind = () => bg.querySelectorAll('#rc .cand').forEach((b) => b.onclick = () => { chosen = cands[+b.dataset.i]; bg.querySelector('#keep').checked = false; bg.querySelector('#rc').innerHTML = paint(); bind(); });
     bind();
-    const rv = bg.querySelector('#rrpview'); if (rv) rv.onclick = (e) => { e.preventDefault(); API.openUrl(rrpHit.url); };
     if (!cands.length) bg.querySelector('#keep').checked = true;
     bg.querySelector('#cancel').onclick = close;
     bg.querySelector('#apply').onclick = async (e) => {
       e.target.disabled = true; e.target.textContent = 'Applying…';
       const o = { ...it };
-      bg.querySelectorAll('[data-k]:checked').forEach((cb) => { o[cb.dataset.k] = auto[cb.dataset.k]; if (cb.dataset.k === 'rrpJpy') { o.rrpSource = 'suggested (Bic Camera)'; o.rrpUrl = rrpHit.url; } });
+      bg.querySelectorAll('[data-k]:checked').forEach((cb) => { o[cb.dataset.k] = auto[cb.dataset.k]; });
       if (cands.length) o.imageCandidates = cands;
       await API.saveItem(o);
       if (chosen && !bg.querySelector('#keep').checked) await API.setImage(o.id, chosen);
       DB = await API.refreshPrices([o.id]);
       close(); toast('Updated'); renderItem(o.id);
+      const fresh = DB.items.find((x) => x.id === o.id) || o;
+      rrpIntro(fresh.limited, () => rrpPicker(fresh, async (c) => { await applyRrp(fresh, c); renderItem(o.id); }), 'Update the RRP too?', 'This takes about 10 seconds. ', 'Update RRP', 'Not now');
     };
   }
 
