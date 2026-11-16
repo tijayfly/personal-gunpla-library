@@ -48,7 +48,7 @@ nav.tabs a.add:hover { filter: brightness(1.08); }
 main { max-width: 1500px; margin: 0 auto; padding: 22px 24px 60px; }
 
 /* ---------- stats ---------- */
-.stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); margin-bottom: 18px; position: relative; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); margin-bottom: 18px; position: relative; }
 .stat { padding: 14px 18px 16px; border-right: 1px solid var(--line); position: relative; }
 .stat:last-child { border-right: 0; }
 .stat-label { font-family: var(--font-cond); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; gap: 6px; }
@@ -277,3 +277,10 @@ table.list td.num { white-space: nowrap; }
 .rrp-b { display: flex; gap: 6px; }
 .money a, .note a { color: var(--blue-2); }
 @media (max-width: 640px) { .rrp-cand { grid-template-columns: 1fr auto; } .rrp-b { grid-column: 1 / -1; } }
+.pl-pill { white-space: nowrap; }
+.card-money.cm-row { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: baseline; gap: 4px 8px; }
+.card-money.cm-row .was { white-space: nowrap; }
+.card-img .pl-pill.on-img { position: absolute; bottom: 8px; right: 10px; color: #fff; background: rgba(0,0,0,.62); }
+.card-img .pl-pill.on-img.gain { background: #0f8a4b; }
+.card-img .pl-pill.on-img.loss { background: #c62828; }
+@media (max-width: 640px) { .card-img .pl-pill.on-img { bottom: 6px; right: 6px; font-size: 10px; } }

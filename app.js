@@ -26,6 +26,8 @@
   const rate = () => (DB.settings && DB.settings.jpyPerGbp) || 200;
   const rrpGbp = (it) => it.rrpJpy ? it.rrpJpy / rate() : null;
   const rrpUnknown = (it) => !it.rrpJpy;
+  // green if you paid under RRP, red if over, plain if about the same
+  const rrpCls = (it) => rrpUnknown(it) || it.gift || it.paid == null ? '' : Math.abs(cost(it) - rrpGbp(it)) < 0.5 ? '' : cost(it) > rrpGbp(it) ? 'loss' : 'gain';
   const rrpText = (it) => rrpUnknown(it) ? '—' : gbp(rrpGbp(it));
   const cost = (it) => it.gift ? 0 : (it.paid || 0);
   const value = (it) => it.current && it.current.gbp != null ? it.current.gbp : null;
@@ -118,7 +120,6 @@
     const valued = items.filter((i) => value(i) != null);
     const val = valued.reduce((s, i) => s + value(i), 0);
     const gain = valued.reduce((s, i) => s + pl(i), 0);
-    const rrp = items.reduce((s, i) => s + (rrpGbp(i) || 0), 0);
     const kits = items.reduce((s, i) => s + (i.qty || 1), 0);
     const gifts = items.filter((i) => i.gift).length;
     return `<section class="stats">
@@ -126,7 +127,6 @@
       <div class="stat"><div class="stat-label">Total paid</div><div class="stat-value">${gbp(paid)}</div><div class="stat-sub">gifts counted as £0</div></div>
       <div class="stat"><div class="stat-label">Current value</div><div class="stat-value">${gbp(val)}</div><div class="stat-sub">${valued.length}/${items.length} priced</div></div>
       <div class="stat"><div class="stat-label">Profit / loss</div><div class="stat-value ${cls(gain)}">${signed(gain)}</div><div class="stat-sub ${cls(gain)}">${paid ? pct((gain / paid) * 100) + ' on cost' : ''}</div></div>
-      <div class="stat"><div class="stat-label">Total RRP</div><div class="stat-value">${gbp(rrp)}</div><div class="stat-sub">${yen(items.reduce((s, i) => s + (i.rrpJpy || 0), 0))} @ ¥${Math.round(rate())}/£${items.filter(rrpUnknown).length ? ' · ' + items.filter(rrpUnknown).length + ' unknown' : ''}</div></div>
     </section>`;
   }
 
@@ -149,17 +149,18 @@
 
   function card(it) {
     const accent = { PG: '#c9a227', MG: '#4a5a70', RG: '#c4161c', HG: '#1d4ea3', EG: '#13955a', SD: '#e0478f', FM: '#6b3fb8', AG: '#0f8fa3', Mega: '#ef6c00' }[it.grade] || '#5c6575';
-    let money = '';
+    let money = '', plTag = '';
     if (!VIEW) {
       if (it.list === 'wishlist') {
         money = `<div class="card-money"><span><span class="now">${gbp(value(it))}</span> <span class="was">now</span></span><span class="was">target ${gbp(it.targetPrice)}</span></div>`;
       } else {
         const p = pl(it);
-        money = `<div class="card-money"><span><span class="now">${gbp(value(it))}</span> <span class="was">${it.gift ? 'gift' : 'paid ' + gbp(cost(it))}</span></span><span class="pl-pill ${cls(p)}">${signed(p)}</span></div>`;
+        if (p != null) plTag = `<span class="pl-pill on-img ${cls(p)}">${signed(p)}</span>`;
+        money = `<div class="card-money cm-row"><span class="now">${gbp(value(it))}</span><span class="was">${it.gift ? 'gift' : 'paid ' + gbp(cost(it))}${rrpUnknown(it) ? '' : ` · RRP ${rrpText(it)}`}</span></div>`;
       }
     }
     return `<a class="card" href="#/item/${it.id}" style="--card-accent:${accent}">
-      <div class="card-img">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${it.limited ? '<span class="flag">LIMITED</span>' : ''}</div>
+      <div class="card-img">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${it.limited ? '<span class="flag">LIMITED</span>' : ''}${plTag}</div>
       <div class="card-body"><div class="card-title">${esc(it.title)}${it.qty > 1 ? ` <span class="model-no">×${it.qty}</span>` : ''}</div><div class="card-series">${esc(it.series || '')}</div>${money}</div>
     </a>`;
   }
@@ -177,7 +178,7 @@
         <td><span class="grade g-${it.grade}">${it.grade}</span></td><td>${esc(it.title)}${it.qty > 1 ? ' ×' + it.qty : ''}${it.limited ? ' <span class="model-no">LTD</span>' : ''}</td><td class="model-no">${esc(it.scale || '')}</td><td>${esc(it.series || '')}</td>`;
       if (!VIEW) {
         if (list === 'wishlist') tds += `<td class="num">${gbp(it.targetPrice)}</td><td class="num">${rrpText(it)}</td><td class="num">${gbp(value(it))}</td>`;
-        else tds += `<td class="num">${it.gift ? 'Gift' : gbp(cost(it))}</td><td class="num">${rrpText(it)}</td><td class="num">${gbp(value(it))}</td><td class="num ${cls(pl(it))}">${signed(pl(it))}</td><td class="num ${cls(pl(it))}">${pct(plPct(it))}</td>`;
+        else tds += `<td class="num">${it.gift ? 'Gift' : gbp(cost(it))}</td><td class="num ${rrpCls(it)}">${rrpText(it)}</td><td class="num">${gbp(value(it))}</td><td class="num ${cls(pl(it))}">${signed(pl(it))}</td><td class="num ${cls(pl(it))}">${pct(plPct(it))}</td>`;
       }
       return `<tr data-id="${it.id}">${tds}</tr>`;
     }).join('');
@@ -241,9 +242,8 @@
         money = `<div class="money"><div><div class="k">Target price</div><div class="v">${gbp(it.targetPrice)}</div><div class="s">from your list</div></div>${curLine}${rrpLine}</div>`;
       } else {
         const p = pl(it);
-        money = `<div class="money"><div><div class="k">Price paid</div><div class="v">${it.gift ? 'Gift' : gbp(cost(it), 2)}</div><div class="s">${it.gift ? 'counted as £0' : ''}</div></div>${curLine}${rrpLine}
-          <div><div class="k">vs RRP</div><div class="v ${cls(it.rrpJpy && Math.abs(rrpGbp(it) - cost(it)) >= 0.5 ? rrpGbp(it) - cost(it) : null)}" style="font-size:18px">${rrpUnknown(it) ? '—' : it.rrpJpy && !it.gift ? (Math.abs(cost(it) - rrpGbp(it)) < 0.5 ? 'Paid RRP' : cost(it) > rrpGbp(it) ? 'Paid ' + gbp(cost(it) - rrpGbp(it)) + ' over' : 'Paid ' + gbp(rrpGbp(it) - cost(it)) + ' under') : '—'}</div></div>
-          <div class="pl"><span class="k">Profit / loss</span><span class="v ${cls(p)}">${signed(p)} <span style="font-size:14px">${pct(plPct(it))}</span></span></div></div>`;
+        money = `<div class="money"><div><div class="k">Price paid</div><div class="v">${it.gift ? 'Gift' : gbp(cost(it), 2)}</div><div class="s">${it.gift ? 'counted as £0' : ''}</div></div>${curLine}<div class="pl"><span class="k">Profit / loss</span><span class="v ${cls(p)}">${signed(p)} <span style="font-size:14px">${pct(plPct(it))}</span></span></div>${rrpLine}
+          <div><div class="k">vs RRP</div><div class="v ${cls(it.rrpJpy && Math.abs(rrpGbp(it) - cost(it)) >= 0.5 ? rrpGbp(it) - cost(it) : null)}" style="font-size:18px">${rrpUnknown(it) ? '—' : it.rrpJpy && !it.gift ? (Math.abs(cost(it) - rrpGbp(it)) < 0.5 ? 'Paid RRP' : cost(it) > rrpGbp(it) ? 'Paid ' + gbp(cost(it) - rrpGbp(it)) + ' over' : 'Paid ' + gbp(rrpGbp(it) - cost(it)) + ' under') : '—'}</div></div></div>`;
       }
     }
     const actions = VIEW ? '' : `<div class="actions">
@@ -311,7 +311,7 @@
     o.limited = !!f.get('limited');
     const r = f.get('rrpJpy'); o.rrpJpy = r === '' ? null : Number(r);
     if (o.rrpJpy == null) o.rrpSource = '[unknown]';
-    else if (f.get('rrpVerified')) o.rrpSource = 'verified';
+    else if (f.get('rrpVerified') || o.rrpJpy !== base.rrpJpy) { o.rrpSource = 'verified'; if (o.rrpJpy !== base.rrpJpy) delete o.rrpUrl; }
     else if (o.rrpSource === 'verified' || /^\[unknown\]/.test(o.rrpSource || '')) o.rrpSource = 'entered manually';
     if (o.list === 'wishlist') { const t = f.get('targetPrice'); o.targetPrice = t === '' ? null : Number(t); o.whereToBuy = (f.get('whereToBuy') || '').trim(); }
     else { o.gift = !!f.get('gift'); const p = f.get('paid'); o.paid = o.gift || p === '' ? null : Number(p); }
@@ -578,7 +578,7 @@
       document.getElementById('rf').onsubmit = async (ev) => {
         ev.preventDefault();
         const o = readFields(ev.target, draft);
-        if (pickedRrp && o.rrpJpy === pickedRrp.priceJpy && o.rrpSource !== 'verified') { o.rrpSource = 'suggested (Bic Camera)'; o.rrpUrl = pickedRrp.url; }
+        if (pickedRrp && o.rrpJpy === pickedRrp.priceJpy && !new FormData(ev.target).get('rrpVerified')) { o.rrpSource = 'suggested (Bic Camera)'; o.rrpUrl = pickedRrp.url; }
         await API.saveItem(o);
         if (chosen) await API.setImage(o.id, chosen);
         DB = await API.refreshPrices([o.id]);
