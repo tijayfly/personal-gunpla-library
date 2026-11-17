@@ -143,18 +143,17 @@
 
   function card(it) {
     const accent = { PG: '#c9a227', MG: '#4a5a70', RG: '#c4161c', HG: '#1d4ea3', EG: '#13955a', SD: '#e0478f', FM: '#6b3fb8', AG: '#0f8fa3', Mega: '#ef6c00' }[it.grade] || '#5c6575';
-    let money = '', plTag = '';
+    let money = '';
     if (!VIEW) {
       if (it.list === 'wishlist') {
         money = `<div class="card-money"><span><span class="now">${gbp(value(it))}</span> <span class="was">now</span></span><span class="was">target ${gbp(it.targetPrice)}</span></div>`;
       } else {
         const p = pl(it);
-        if (p != null) plTag = `<span class="pl-pill on-img ${cls(p)}">${signed(p)}</span>`;
-        money = `<div class="card-money cm-row"><span class="now">${gbp(value(it))}</span><span class="was">${it.gift ? 'gift' : 'paid ' + gbp(cost(it))}</span></div>`;
+        money = `<div class="card-money cm-row"><span class="now">${gbp(value(it))}</span><span class="was">${it.gift ? 'gift' : 'paid ' + gbp(cost(it))}</span>${p != null ? `<span class="pl-pill ${cls(p)}">${signed(p)}</span>` : ''}</div>`;
       }
     }
     return `<a class="card" href="#/item/${it.id}" style="--card-accent:${accent}">
-      <div class="card-img${it.limited ? ' ltd' : ''}">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${VIEW ? (it.limited ? '<span class="flag pill">LIMITED</span>' : '') : it.limited ? '<span class="flag">LIMITED</span>' : '<span class="flag std">STANDARD</span>'}${plTag}</div>
+      <div class="card-img">${imgTag(it)}<span class="grade g-${it.grade}">${it.grade}</span>${it.scale ? `<span class="scale">${esc(it.scale)}</span>` : ''}${it.limited ? '<span class="flag">LIMITED</span>' : ''}</div>
       <div class="card-body"><div class="card-title">${esc(it.title)}${it.qty > 1 ? ` <span class="model-no">×${it.qty}</span>` : ''}</div><div class="card-series">${esc(it.series || '')}</div>${money}</div>
     </a>`;
   }
